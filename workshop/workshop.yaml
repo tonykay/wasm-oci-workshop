@@ -1,21 +1,11 @@
 ---
-name: WebAssembly and OCI - Better Together (v1.0.0)
+name: WebAssembly and OCI - Better Together
 modules:
   activate:
     - connection
     - overview
     - documentation/getting-setup
-    - documentation/systemd
-    - documentation/firewalld
-    - documentation/nftables
-    - documentation/ebpf
+    - documentation/webassembly-container-toolchain
     - documentation/podman
     - documentation/buildah
-    - documentation/image-builder
-    - documentation/virtualization
-    - documentation/tlog
-    - documentation/lvm-vdo
-    - documentation/stratis
-    - documentation/kpatch
-    - documentation/boom-kernel-parms
     - documentation/leapp

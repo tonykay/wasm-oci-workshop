@@ -39,3 +39,8 @@ run: ##
 	$(EXTRA_ARGS)
 
 all: build run
+
+stop: kill
+
+kill:
+	$(CONTAINER_ENGINE) kill $(IMAGE_NAME)
