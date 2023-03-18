@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# This 'setup' script is where you can add steps that should be run each
+# time the container for the workshop is started. Note that if you are
+# using persistent storage with a workshop and make changes to files from
+# this script, or are deploying applications, your scripts must cope with
+# the steps having already been run. This is because this script will be
+# run a second time if the container were restarted for some reason.
+
+
+##    Definitive RHEL 8 Hands-On Lab (custom setup)
+
+##
+##    NOTE: this is no longer needed since I corrected the exported vars
+##          in the agnosticd config post_software.yml
+##          
+##          But, I'll leave it here to serve as a possible alternative
+##          solution for another day
+##
+
+##
+##    set simple variables from key:values
+##    passed into comtainer
+##
+
+# mySSH_COMMAND=`echo $WORKSHOP_VARS | jq -r .ssh_command`
+# mySSH_PASSWORD=`echo $WORKSHOP_VARS | jq -r .ssh_password`
+
+# myUSERNAME=`echo $WORKSHOP_VARS | jq -r .username`
+# myTARGETHOST_FQDN=`echo $WORKSHOP_VARS | jq -r .targethost`
+# myGUID=`echo $WORKSHOP_VARS | jq -r .guid`
+
+##
+##
+##
+
+# find /opt/app-root/workshop/content/ -type f -exec sed -i "s/%WORKSHOP_SSH_COMMAND%/${mySSH_COMMAND}/g" {} \;
+# find /opt/app-root/workshop/content/ -type f -exec sed -i "s/%WORKSHOP_SSH_PASSWORD%/${mySSH_PASSWORD}/g" {} \;
+# find /opt/app-root/workshop/content/ -type f -exec sed -i "s/%WORKSHOP_GUID%/${myGUID}/g" {} \;
+# find /opt/app-root/workshop/content/ -type f -exec sed -i "s/%WORKSHOP_USERNAME%/${myUSERNAME}/g" {} \;
+# find /opt/app-root/workshop/content/ -type f -exec sed -i "s/%WORKSHOP_TARGETHOST_FQDN%/${myTARGETHOST_FQDN}/g" {} \;
+
+

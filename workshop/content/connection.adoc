@@ -1,0 +1,91 @@
+:guid: %guid%
+:ssh_command: %ssh_command%
+:ssh_password: %ssh_password%
+:ssh_username: %ssh_username%
+:targethost_fqdn: %targethost%
+:markup-in-source: verbatim,attributes,quotes
+:show_solution: true
+:format_cmd_exec: source,options="nowrap",,role="copy",subs="{markup-in-source}"
+:format_cmd_exec2: source,options="nowrap",role="copy",subs="{markup-in-source}"
+:format_cmd_output: bash,options="nowrap",subs="{markup-in-source}"
+ifeval::["%cloud_provider%" == "ec2"]
+:format_cmd_exec: source,options="nowrap",role="execute",subs="{markup-in-source}"
+:format_cmd_exec2: source,options="nowrap",role="execute-2",subs="{markup-in-source}"
+endif::[]
+
+
+
+
+WARNING:  Executing these setup tasks is a requirement before proceeding with the workshop exercises.
+
+== Workshop Setup
+
+These steps should be easy to click-through if you are using the bookbag terminal. 
+
+Connect to target host (bastion) via ssh:
+
+[{format_cmd_exec}]
+----
+{ssh_command} -o "StrictHostKeyChecking no"
+----
+
+Send the password:
+
+[{format_cmd_exec}]
+----
+{ssh_password}
+----
+
+Launch a 'tmux' (terminal multiplexer):
+
+[{format_cmd_exec}]
+----
+workshop-tmux.sh TERM1 
+----
+
+Use sudo to escalate your user priviledges and run the setup:
+
+[{format_cmd_exec}]
+----
+sudo -i
+----
+
+== Set Up Terminal 2
+
+Like wise, let us proceed to set up the second terminal for use later.
+
+[{format_cmd_exec2}]
+----
+{ssh_command} -o "StrictHostKeyChecking no"
+----
+
+[{format_cmd_exec2}]
+----
+{ssh_password}
+----
+
+[{format_cmd_exec2}]
+----
+workshop-tmux.sh TERM2
+----
+
+[{format_cmd_exec2}]
+----
+sudo -i
+----
+
+You are now ready to proceed with the exercises.
+
+
+== Connection Details
+
+[bash,options="nowrap",subs="{markup-in-source}"]
+
+  * Unique session GUID: *{guid}*
+
+  * Target host FQDN: *{targethost_fqdn}*
+
+  * Username: *{ssh_username}*
+
+  * Password: *{ssh_password}*
+

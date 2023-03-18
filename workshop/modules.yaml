@@ -1,0 +1,53 @@
+---
+modules:
+  connection:
+    name:      "Workshop Setup"
+    exit_sign: "Workshop Overview"
+  overview:
+    name:      "Workshop Overview"
+    exit_sign: "Web Console (cockpit)"
+  documentation/webconsole:
+    name:      "Web Console (cockpit)"
+    exit_sign: "Service Management (systemd)"
+  documentation/systemd:
+    name:      "Service Management (systemd)"
+    exit_sign: "Firewall Management (firewalld)"
+  documentation/firewalld:
+    name:      "Firewall Management (firewalld)"
+    exit_sign: "Firewall Rules (nf-tables)"
+  documentation/nftables:
+    name:      "Firewall Rules (nf-tables)"
+    exit_sign: "eBPF Tracing (bcc-tools)"
+  documentation/ebpf: 
+    name:      "eBPF Tracing (bcc-tools)"
+    exit_sign: "Containers Management (podman)"
+  documentation/podman:
+    name:      "Containers Management (podman)"
+    exit_sign: "Containers Dev (buildah)"
+  documentation/buildah:
+    name:      "Containers Dev (buildah)"
+    exit_sign: "Image Builder (composer-cli)"
+  documentation/image-builder:
+    name:      "Image Builder (composer-cli)"
+    exit_sign: "Virtualization (kvm,libvirt)"
+  documentation/virtualization:
+    name:      "Virtualization (kvm,libvirt)"
+    exit_sign: "Session Logging (tlog)"
+  documentation/tlog:
+    name:      "Session Logging (tlog)"
+    exit_sign: "Data Optimization (lvm,vdo)"
+  documentation/lvm-vdo:
+    name:      "Data Optimization (lvm,vdo)"
+    exit_sign: "Storage Management (stratis)"
+  documentation/stratis:
+    name:      "Storage Management (stratis)"
+    exit_sign: "Kernel Live Patching (kpatch)"
+  documentation/kpatch:
+    name:      "Kernel Live Patching (kpatch)"
+    exit_sign: "Managing GRUB2 with Boom"
+  documentation/boom-kernel-parms:
+    name:      "Managing GRUB2 with Boom"
+    exit_sign: "LEAPP In-Place Upgrades"
+  documentation/leapp:
+    name:      "LEAPP In-Place Upgrades"
+    exit_sign: "Finish Workshop"

@@ -1,0 +1,8 @@
+image: asciidoctor/docker-asciidoctor:latest
+
+pages:
+  script:
+    - make
+  artifacts:
+    paths:
+    - public

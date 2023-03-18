@@ -1,0 +1,677 @@
+:sectnums:
+:sectnumlevels: 2
+:markup-in-source: verbatim,attributes,quotes
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+:nic0: ens3
+:format_cmd_exec: source,options="nowrap",subs="{markup-in-source}",role="copy"
+:format_cmd_output: bash,options="nowrap",subs="{markup-in-source}"
+ifeval::["%cloud_provider%" == "ec2"]
+:nic0: eth0
+:format_cmd_exec: source,options="nowrap",subs="{markup-in-source}",role="execute"
+endif::[]
+
+
+:toc:
+:toclevels: 1
+
+= Firewalld - Firewall Service Management
+
+== Overview
+
+The *firewalld* daemon provides a dynamically managed network security layer that tightly controls what 
+connections (ports and services) are able to communicate via the system's network interfaces.
+
+Features of firewalld include:
+
+  * support for IPv4 and IPv6 settings
+  * support for ethernet bridges
+  * support for network “zones” which assigns level of trust to a network / connections / interfaces
+  * separation of runtime and permanent configuration options
+  * an interface for external services to manage firewall rules directly
+
+== Getting Started
+
+For these exercises, you will be using the host `node1` as user `root`.
+
+From host `bastion`, ssh to `node1`.
+
+[{format_cmd_exec}]
+----
+ssh node1
+----
+
+Use `sudo` to elevate your privileges.
+
+[{format_cmd_exec}]
+----
+[[ "$UID" == 0 ]] || sudo -i
+----
+
+Verify that you are on the right host for these exercises.
+
+[{format_cmd_exec}]
+----
+workshop-firewalld-checkhost.sh
+----
+
+You are now ready to proceed with these exercises.
+
+
+
+== Core Concepts
+
+The RHEL 9 firewall consists of:
+
+  * firewalld : daemon/service
+  * firewall-cmd : command line management utility
+  * firewall-config : a GUI based management utility 
+
+For this workshop, we are only going to be using firewall-cmd.
+
+=== Configuration
+
+The configuration files for firewalld are stored in two places:
+
+  * /usr/lib/firewalld - distributed system default configs
+  * /etc/firewalld - user customizations / override configs
+ 
+Configurations stored in */usr/lib/firewalld* are NOT meant for customization.  They 
+WILL be overwritten and replaced from time to time as Red Hat releases new packages 
+or updates for the operating system.
+
+User customizations for firewalld belong in */etc/firewalld*.  These configuration 
+files take precedence over the system default configs.
+
+
+
+=== Services
+
+Similar to systemd, firewalld implements the concept of a service:  
+
+  * a "service" includes a common name
+  * a port or range of ports
+  * a protocol
+  * a netfilter helper module
+  * a destination address (or range) for IPv4 and/or IPv6.
+
+
+There are nearly 50 built-in services shipped with firewalld.  You can also create your own service configs from scratch or customize the default files.  More on that coovered in the exercises below.
+
+Let's take a quick look at the default configuration for ssh & http to start.
+
+[{format_cmd_exec}]
+----
+cat /usr/lib/firewalld/services/ssh.xml
+----
+
+[{format_cmd_output}]
+----
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>SSH</short>
+  <description>Secure Shell (SSH) is a protocol for logging into and executing commands on remote machines. It provides secure encrypted communications. If you plan on accessing your machine remotely via SSH over a firewalled interface, enable this option. You need the openssh-server package installed for this option to be useful.</description>
+  <port protocol="tcp" port="22"/>
+</service>
+----
+
+[{format_cmd_exec}]
+----
+cat /usr/lib/firewalld/services/http.xml
+----
+
+[{format_cmd_output}]
+----
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>WWW (HTTP)</short>
+  <description>HTTP is the protocol used to serve Web pages. If you plan to make your Web server publicly available, enable this option. This option is not required for viewing pages locally or developing Web pages.</description>
+  <port protocol="tcp" port="80"/>
+</service>
+----
+
+== Determine State
+
+NOTE: Firewalld maintains two states of the firewall configuration: runtime and permanent.
+When you make changes to the configuration it is important to consider what is currently
+running and what will persist past the next reboot.
+
+Determine current state of the firewalld service.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --state
+----
+
+[{format_cmd_output}]
+----
+running
+----
+
+Get a list of currently configured and active "zones".
+
+[{format_cmd_exec}]
+----
+firewall-cmd --get-active-zones
+----
+
+[{format_cmd_output}]
+----
+public
+  interfaces: {nic0}
+----
+
+You may have one or more zones depending on the host and it's configuration:
+
+  * `public` zone on interface `{nic0}`
+  * `libvirt` zone on interface `virbr0`
+  
+NOTE:  In this sample output, the virtual bridge `libvirt` is created and managed by libvirtd.  It is possible that your system will not have the libvirt zone.  For our purposes, we are only interested in the public zone and the interface `{nic0}`.
+
+We had this information from the previous command, but to be more specific let's just list the physical interfaces associated with the public zone.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --zone=public --list-interfaces
+----
+
+[{format_cmd_output}]
+----
+{nic0}
+----
+
+Get a list of services configured on the public zone.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --zone=public --list-services
+----
+
+[{format_cmd_output}]
+----
+cockpit dhcpv6-client ssh
+----
+
+We see the web console, the dhcp client and of course the ssh service.
+
+Now let's get some specific data points on the web console service (cockpit).
+
+[{format_cmd_exec}]
+----
+firewall-cmd --info-service=cockpit
+----
+
+[{format_cmd_output}]
+----
+cockpit
+  ports: 9090/tcp
+  protocols:
+  source-ports:
+  modules:
+  destination:
+  includes:
+  helpers:
+----
+
+Nothing too exciting, but we can note that the web console is configured on port 9090.
+
+Finally, let's just list everything about the public zone.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --zone=public --list-all
+----
+
+[{format_cmd_output}]
+----
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: {nic0}
+  sources:
+  services: cockpit dhcpv6-client http ssh
+  ports:
+  protocols:
+  forward: yes
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+----
+
+
+
+
+== Managing Default Services
+
+Default Services are those that are pre-defined by configuration files in either */etc/firewalld* or */usr/lib/firewalld*.  This would include any configs delivered by Red Hat as part of the operating system or those added by a system administer.
+
+Here we will take a moment to enable the http and https service ports.
+
+
+
+
+
+=== Add a Service
+
+[{format_cmd_exec}]
+----
+firewall-cmd --add-service={http,https}
+----
+
+[{format_cmd_exec}]
+----
+firewall-cmd --zone=public --list-all
+----
+
+[{format_cmd_output}]
+----
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: ens3
+  sources:
+  services: cockpit dhcpv6-client http https ssh
+  ports: 
+  protocols:
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+----
+
+
+Remember how we mentioned above about the two configuration states: runtime and permanent?
+Notice below how the permanent state dose NOT include http or https.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --zone=public --list-all --permanent
+----
+
+[{format_cmd_output}]
+----
+public
+  target: default
+  icmp-block-inversion: no
+  interfaces:
+  sources:
+  services: cockpit dhcpv6-client ssh
+  ports: 
+  protocols:
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+----
+
+A quick way to make them permanent is to save the current runtime state to permanent.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --runtime-to-permanent
+----
+
+NOTE: you could have also run the same configuration command a second time and 
+passed the *--permanent* flag as follows `firewall-cmd --permanent --add-service={http,https}`.  
+It's annoying but necessary to run configuration commands twice to manage both states and
+maintain consistency.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --zone=public --list-all --permanent
+----
+
+[{format_cmd_output}]
+----
+public
+  target: default
+  icmp-block-inversion: no
+  interfaces:
+  sources:
+  services: cockpit dhcpv6-client http https ssh
+  ports: 
+  protocols:
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+----
+
+
+
+=== Remove a Default Service
+
+Now let us disable a service port not needed for our workshop environment, namely *dhcp6-client*.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --remove-service=dhcpv6-client
+firewall-cmd --runtime-to-permanent
+----
+
+Take a look at the active services now and you should find dhcp6-client absent.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --list-services
+----
+
+[{format_cmd_output}]
+----
+cockpit http https ssh
+----
+
+And since we also ran a --runtime-to-permanent, both the
+runtime and permanent configs were updated.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --list-services --permanent
+----
+
+[{format_cmd_output}]
+----
+cockpit http https ssh
+----
+
+
+
+== Managing Ad-hoc Ports
+
+=== Add a Port
+
+Since we have been toying with http, it's common for httpd to also be configured on ports 8080 and 8443.  So let's simply create and ad-hoc rule to make those ports available.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --add-port=8080/tcp --add-port=8443/tcp
+firewall-cmd --runtime-to-permanent
+----
+
+[{format_cmd_exec}]
+----
+firewall-cmd --zone=public --list-all
+----
+
+[{format_cmd_output}]
+----
+public
+  target: default
+  icmp-block-inversion: no
+  interfaces:
+  sources:
+  services: cockpit http https ssh
+  ports: 8080/tcp 8443/tcp
+  protocols:
+  forward: yes
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+----
+
+=== Remove a Port
+
+As much fun as that was, ad-hoc was quick and easy but not ideal.  We really desire a formal configuration, so let us undo the ad-hoc rules.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --remove-port=8080/tcp --remove-port=8443/tcp
+firewall-cmd --runtime-to-permanent
+----
+
+[{format_cmd_exec}]
+----
+firewall-cmd --zone=public --list-all
+----
+
+[{format_cmd_output}]
+----
+public
+  target: default
+  icmp-block-inversion: no
+  interfaces:
+  sources:
+  services: cockpit http https ssh
+  ports:
+  protocols:
+  forward: yes
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+----
+
+
+
+== Customizing a Default Service
+
+=== Install Override Configuration 
+
+[{format_cmd_exec}]
+----
+workshop-firewalld-customconfigs.sh
+----
+
+Two configuration files were just created */etc/firewalld/services*
+
+They are identical to the system defaults except that our additional ports (8080 and 8443) were added the the definition.
+
+[{format_cmd_exec}]
+----
+cat /etc/firewalld/services/http.xml
+----
+
+[{format_cmd_output}]
+----
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>WWW (HTTP)</short>
+  <description>HTTP is the protocol used to serve Web pages. If you plan to make your Web server publicly available, enable this option. This option is not required for viewing pages locally or developing Web pages.</description>
+  <port protocol="tcp" port="80"/>
+  <port protocol="tcp" port="8080"/>
+</service>
+----
+
+[{format_cmd_exec}]
+----
+cat /etc/firewalld/services/https.xml
+----
+
+[{format_cmd_output}]
+----
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>Secure WWW (HTTPS)</short>
+  <description>HTTPS is a modified HTTP used to serve Web pages when security is important. Examples are sites that require logins like stores or web mail. This option is not required for viewing pages locally or developing Web pages. You need the httpd package installed for this option to be useful.</description>
+  <port protocol="tcp" port="443"/>
+  <port protocol="tcp" port="8443"/>
+</service>
+----
+
+===  Activate Service
+
+Since the httpd service is already active, all we really need to do is reload firewalld.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --reload
+----
+
+=== Verification
+
+[{format_cmd_exec}]
+----
+firewall-cmd --info-service=http
+----
+
+[{format_cmd_output}]
+----
+http
+  ports: 80/tcp 8080/tcp
+  protocols:
+  source-ports:
+  modules:
+  destination:
+  includes:
+  helpers:
+----
+
+[{format_cmd_exec}]
+----
+firewall-cmd --info-service=https
+----
+
+[{format_cmd_output}]
+----
+https
+  ports: 443/tcp 8443/tcp
+  protocols:
+  source-ports:
+  modules:
+  destination:
+  includes:
+  helpers:
+----
+
+[{format_cmd_exec}]
+----
+firewall-cmd --zone=public --list-all --permanent
+----
+
+[{format_cmd_output}]
+----
+public
+  target: default
+  icmp-block-inversion: no
+  interfaces:
+  sources:
+  services: cockpit http https ssh
+  ports: 
+  protocols:
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+----
+
+
+
+== Custom Service From Scratch
+
+In this exercise you will create a custom service with a unique name.
+
+=== Configuration File
+
+First, have a look at the configuration file which has already been prepared for you.  It should be fairly self explanatory.
+
+[{format_cmd_exec}]
+----
+cat /usr/local/etc/firewalld-customname.xml
+----
+
+./usr/local/etc/firewalld-customname.xml
+[{format_cmd_output}]
+----
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+ <short>workshop</short>
+ <description>Workshop Test Service</description>
+ <port protocol="tcp" port="7890" />
+ <port protocol="udp" port="7890" />
+</service>
+----
+
+=== Configuration Import
+
+Now it is time to import the config file.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --new-service-from-file=/usr/local/etc/firewalld-customname.xml --name=workshop --permanent
+----
+
+[{format_cmd_exec}]
+----
+firewall-cmd --reload
+----
+
+=== Activate Service
+
+Finally, activate the service and verify.
+
+[{format_cmd_exec}]
+----
+firewall-cmd --add-service=workshop
+----
+
+[{format_cmd_exec}]
+----
+firewall-cmd --zone=public --list-all
+----
+
+
+Just make note of the fact we did not use the '--permanent' option with any of our commands.  If the system reboots, or if firewalld is reloaded then the custom named serviced will be lost.  You can preserve the customizations with a simple `firewall-cmd --runtime-to-permanent`
+
+And you are done!
+
+== Panic Mode
+
+Panic mode allows you to immediately turn off all network traffic on a host.  
+
+This is handy to know, but unless you are on the physical system console or remote managed console (ie: ILO, DRAC, etc...) this can be very disruptive.  So we'll provide the commands under the strict guidance that you *DON'T RUN THESE COMMANDS* during this workshop.
+
+[WARNING]
+====
+_DO NOT RUN THESE COMMANDS_
+----
+firewall-cmd --query-panic
+
+firewall-cmd --panic-on 
+
+firewall-cmd --panic-off
+----
+====
+
+== Conclusion
+
+That concludes this unit on firewalld. 
+
+Time to finish this unit and return the shell to it's home position.
+
+[{format_cmd_exec}]
+----
+workshop-finish-exercise.sh
+----
+
+== Additional Resources
+
+You can find more information:
+
+    * link:https://developers.redhat.com/blog/2018/08/10/firewalld-the-future-is-nftables/[Firewalld: The Future is nftables]
+    * link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/configuring_firewalls_and_packet_filters/using-and-configuring-firewalld_firewall-packet-filters[Using And Configuring Firewalls]
+    
+[discrete]
+== End of Unit
+
+ifdef::env-github[]
+link:../RHEL9-Workshop.adoc#toc[Return to TOC]
+endif::[]
+
+////
+Always end files with a blank line to avoid include problems.
+////
+

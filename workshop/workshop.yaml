@@ -1,0 +1,21 @@
+---
+name: Definitive RHEL9 Workshop (v9.0)
+modules:
+  activate:
+    - connection
+    - overview
+    - documentation/webconsole
+    - documentation/systemd
+    - documentation/firewalld
+    - documentation/nftables
+    - documentation/ebpf
+    - documentation/podman
+    - documentation/buildah
+    - documentation/image-builder
+    - documentation/virtualization
+    - documentation/tlog
+    - documentation/lvm-vdo
+    - documentation/stratis
+    - documentation/kpatch
+    - documentation/boom-kernel-parms
+    - documentation/leapp

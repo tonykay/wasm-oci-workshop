@@ -1,0 +1,318 @@
+:sectnums:
+:sectnumlevels: 3
+:markup-in-source: verbatim,attributes,quotes
+:imagesdir: ./_images
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+:format_cmd_exec: source,options="nowrap",role="copy",subs="{markup-in-source}"
+:format_markup: bash,options="nowrap",subs="{markup-in-source}"
+:format_plain: bash,options="nowrap"
+ifeval::["%cloud_provider%" == "ec2"]
+:format_cmd_exec: source,options="nowrap",role="execute",subs="{markup-in-source}"
+endif::[]
+
+
+:toc:
+:toclevels: 1
+
+= Image Builder
+
+== Overview
+
+When installing Red Hat Enterprise Linux from scratch, the traditional methods are:
+
+  * Use the DVD ISO
+  * Use the BOOT ISO with network accessible repos 
+  * Use the pre-built KVM Guest images (qcow2)
+
+Leveraging additional tools and services (ie: pxe, dhcp, kickstart, ansible automation, ipmi, 
+redfish, etc...) the process can be heavily automated and turned into a completely hands-free task.
+We have doing this for decades.
+
+Using Red Hat Enterprise Linux 9, there is a new method for creating RHEL images to add 
+to your toolbox: *Image Builder*.
+
+*Image Builder* is a collection of tools that create custom RHEL images in a variety of formats for 
+compatibility with major cloud providers and virtualization technologies.  Meaning, you can design 
+an OS blueprint and then specify the target platfrom to create an appropriate image (ie: VMWare, 
+AWS, Openstack, KVM, etc...).
+
+NOTE: You CAN create images of multiple RHEL minor releases that are different from the host (ex: RHEL 8.4, RHEL 8.5) but to do so requires additional repo configurations which are not available in this workshop environment.
+
+NOTE: Internet connectivity is not a prerequisite, however Image Builder is configured to connect to Red Hat CDN by default and must be modified to work in an isolated environment or with content views provided by Red Hat Satellite.
+
+== Getting Started
+
+For these exercises, you will be using the host `bastion` as user `root`.
+
+Use `sudo` to elevate your privileges.
+
+[{format_cmd_exec}]
+----
+[[ "$UID" == 0 ]] || sudo -i
+----
+
+Verify that you are on the right host for these exercises.
+
+[{format_cmd_exec}]
+----
+workshop-imagebuilder-checkhost.sh
+----
+
+You are now ready to proceed with these exercises.
+
+
+== Installation and Configuration
+
+Install the required packages - this will pull in several Python related dependencies.
+
+[{format_cmd_exec}]
+----
+yum install -y osbuild-composer composer-cli cockpit-composer guestfs-tools
+----
+
+Ensure everything is stopped while we reconfigure things for this exercise.
+
+[{format_cmd_exec}]
+----
+systemctl stop osbuild-composer.socket
+systemctl stop osbuild-worker@.service.d osbuild-worker@1.service osbuild-composer.service
+----
+
+Depending on the environment the workshop is running in, probably need to adjust
+the sources of the available repos used by the image-builder.
+
+WARNING:  At this time, the assumption is that this host registered to a Red Hat Satellite Server.  Please consult your instructor for alternative instructions if this is not the case:
+
+The steps to configure the image-builder have been condensed into a shell script.  If you are curious to examine exactly what is being done, have 
+a look at /usr/local/bin/workshop-imagebuilder-config.sh.  Either way, go ahead and run it now.
+
+
+[{format_cmd_exec}]
+----
+workshop-imagebuilder-config.sh
+----
+
+And with that, we are ready to proceed building images.
+
+
+
+== Create a Blueprint
+
+Blueprints are defined by a TOML configuration file.  A sample has been provided to get us started with a very basic definition.
+
+
+[{format_cmd_exec}]
+----
+cat /usr/local/etc/imagebuilder-sample.toml
+----
+
+[{format_plain}]
+----
+name = "sample-webserver"
+description = "standard apache httpd webserver"
+version = "0.0.1"
+
+[customizations.services]
+enabled = ["httpd"]
+
+[customizations.firewall.services]
+enabled = ["http","https"]
+
+[[modules]]
+version = "2.4.*"
+name = "httpd"
+
+[[modules]]
+version = "2.4.*"
+name = "mod_ssl"
+
+[[packages]]
+version = "*"
+name = "openssh-server"
+
+[[packages]]
+version = "*"
+name = "rsync"
+----
+
+Looking over the blueprint, it should be apparent that this image blueprint builds on a standard RHEL base by:
+
+    * enabling the httpd service 
+    * adding a few packages 
+
+Now we need to push the blueprint to our image builder catalog.
+
+[{format_cmd_exec}]
+----
+composer-cli blueprints push /usr/local/etc/imagebuilder-sample.toml
+----
+
+
+== List Blueprints
+
+[{format_cmd_exec}]
+----
+composer-cli blueprints list
+----
+
+[{format_cmd_output}]
+----
+sample-webserver
+----
+
+A nice quick way to determine if the local `Image Builder` can resolve all dependencies for the blueprint is to run  it thorugh a `depsolve`.  Here you can also see a full list of rpms that will be installed on the image.
+
+[{format_cmd_exec}]
+----
+composer-cli blueprints depsolve sample-webserver
+----
+
+If everything is in order, you output should look something like this.
+
+[{format_plain}]
+----
+blueprint: sample-webserver v0.0.1
+    mpfr-4.1.0-7.el9.x86_64
+    1:python3-nftables-0.9.8-12.el9.x86_64
+    libseccomp-2.5.2-2.el9.x86_64
+    crypto-policies-20220223-1.git5203b41.el9_0.1.noarch
+    hostname-3.23-6.el9.x86_64
+    libpwquality-1.4.4-8.el9.x86_64
+    publicsuffix-list-dafsa-20210518-3.el9.noarch
+    rsync-3.2.3-9.el9_0.1.x86_64
+    iptables-libs-1.8.7-28.el9.x86_64
+    keyutils-libs-1.6.1-4.el9.x86_64
+    libssh-config-0.9.6-3.el9.noarch
+    tpm2-tss-3.0.3-7.el9.x86_64
+    pcre-8.44-3.el9.3.x86_64
+    iptables-nft-1.8.7-28.el9.x86_64
+...SNIP...
+----
+
+If you see errors or packages that can not be resolved, this is likely a problem with the osbuild repo configuration(s).  Let your instructor know and hopefully this can be fixed.
+
+== Compose a Blueprint
+
+We are now ready to compose the blueprint into an image.
+
+[{format_cmd_exec}]
+----
+composer-cli compose start sample-webserver qcow2
+----
+
+[{format_plain}]
+----
+Compose 812019dd-20e5-4528-a99b-09fbe47ca2d8 added to the queue
+----
+
+[{format_cmd_exec}]
+----
+composer-cli compose status
+----
+
+[{format_cmd_exec}]
+----
+composer-cli compose list
+----
+
+[{format_plain}]
+----
+812019dd-20e5-4528-a99b-09fbe47ca2d8 *FINISHED* sample-webserver 0.0.1 qcow2
+----
+
+It may take a few minutes, but eventually you should see a "FINISHED" status.  Here is a
+simple command to wait for the compose to finish.
+
+[{format_cmd_exec}]
+----
+time until $(composer-cli compose list | head -1 | grep -qi finished); do echo -n "." ; sleep 3; done
+----
+
+WARNING:  It is critical to wait for the compose to finish before proceeding.
+
+
+
+== Retrieve the QCOW Image
+
+We need to grab a copy of the image and put it in the right place for our platform.
+
+[{format_cmd_exec}]
+----
+cd /var/lib/libvirt/images
+----
+
+Take a moment to identify the UUID of the created image.
+
+[{format_cmd_exec}]
+----
+composer-cli compose list
+----
+
+[{format_plain}]
+----
+812019dd-20e5-4528-a99b-09fbe47ca2d8 *FINISHED* sample-webserver 0.0.1 qcow2
+----
+
+Here is a helpful way to store the last FINISHED image UUID to an environment variable.
+
+[{format_cmd_exec}]
+----
+export IMAGE_UUID=$(composer-cli compose list | grep -m 1 FINISHED | awk '{print $1}')
+----
+
+Now use the UUID from your ouput to extract the QCOW image.
+
+[{format_cmd_exec}]
+----
+composer-cli compose image $IMAGE_UUID
+----
+
+Finally you can rename it to something a little more convinient
+
+[{format_cmd_exec}]
+----
+mv $IMAGE_UUID-disk.qcow2 vmguest.qcow2
+----
+
+
+
+== Conclusion
+
+In the next unit, we will tackle how to utilize the native virtualization 
+technology included with RHEL to launch your custom built image.
+
+Time to finish this unit and return the shell to it's home position.
+
+[{format_cmd_exec}]
+----
+workshop-finish-exercise.sh
+----
+
+== Additional Resources
+
+Image Builder
+
+    * link:https://github.com/rlucente-se-jboss/RFESummit2021[RHEL for Edge Demo]
+    * link:https://access.redhat.com/solutions/5773421[Configuring Image Builder with Satellite]
+
+Cockpit Project Page
+
+    * link:http://cockpit-project.org/blog/category/release.html[Cockpit Project]
+
+[discrete]
+== End of Unit
+
+ifdef::env-github[]
+link:../RHEL9-Workshop.adoc#toc[Return to TOC]
+endif::[]
+
+////
+Always end files with a blank line to avoid include problems.
+////
+
