@@ -22,7 +22,7 @@ WARNING:  Executing these setup tasks is a requirement before proceeding with th
 
 These steps should be easy to click-through if you are using the bookbag terminal. 
 
-Connect to target host (bastion) via ssh:
+Connect to your development host (bastion) via ssh:
 
 [{format_cmd_exec}]
 ----
@@ -36,23 +36,11 @@ Send the password:
 {ssh_password}
 ----
 
-Launch a 'tmux' (terminal multiplexer):
-
-[{format_cmd_exec}]
-----
-workshop-tmux.sh TERM1 
-----
-
-Use sudo to escalate your user priviledges and run the setup:
-
-[{format_cmd_exec}]
-----
-sudo -i
-----
+TIP: If you prefer to work from your local laptop terminal client, the above commands should work fine as long as your connection allows outbound ssh (TCP Port 22).
 
 == Set Up Terminal 2
 
-Like wise, let us proceed to set up the second terminal for use later.
+A second terminal is provided as an, optional, convenience and functions identically to the first.
 
 [{format_cmd_exec2}]
 ----
@@ -64,17 +52,7 @@ Like wise, let us proceed to set up the second terminal for use later.
 {ssh_password}
 ----
 
-[{format_cmd_exec2}]
-----
-workshop-tmux.sh TERM2
-----
-
-[{format_cmd_exec2}]
-----
-sudo -i
-----
-
-You are now ready to proceed with the exercises.
+You are now ready to proceed with the workshop.
 
 
 == Connection Details

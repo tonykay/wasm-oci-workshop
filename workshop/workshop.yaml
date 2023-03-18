@@ -1,10 +1,10 @@
 ---
-name: Definitive RHEL9 Workshop (v9.0)
+name: WebAssembly and OCI - Better Together (v1.0.0)
 modules:
   activate:
     - connection
     - overview
-    - documentation/webconsole
+    - documentation/getting-setup
     - documentation/systemd
     - documentation/firewalld
     - documentation/nftables

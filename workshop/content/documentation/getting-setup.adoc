@@ -1,0 +1,338 @@
+:sectnums:
+:sectnumlevels: 3
+:markup-in-source: verbatim,attributes,quotes
+:imagesdir: ./_images/cockpit-rhel90
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+:ssh_username: <Provided-By-Instructor>
+:ssh_password: <Provided-By-Instructor>
+:targethost_fqdn: <Provided-By-Instructor>
+:subdomain: example.com
+:format_cmd_exec: source,options="nowrap",subs="{markup-in-source}",role="copy"
+:format_cmd_output: bash,options="nowrap",subs="{markup-in-source}"
+ifeval::["%cloud_provider%" == "ec2"]
+:ssh_password: %ssh_password%
+:ssh_username: %ssh_username%
+:targethost_fqdn: %targethost%
+:subdomain: %subdomain_internal%
+:format_cmd_exec: source,options="nowrap",subs="{markup-in-source}",role="execute"
+endif::[]
+
+
+
+:toc:
+:toclevels: 1
+
+= Setup Your Development Environment
+
+== Overview
+
+In this lab we'll setup our environment for WebAssembly development with Rust. Your development host is subscribed to a number of repositories that should allow you to customize it and install any favorite tools and languages. 
+
+You are welcome to bring your own code and/or `.wasm` artifacts but the proceeded examples are "know good" and have been tested extensively.
+
+WARNING: You have `root` access on your development machine via passwordless sudo `sudo -i` so it is entirely possible to wreak havoc on your environment! Take care when working as `root`. 
+
+
+Your development machine is a Red Hat Enterprise Linux 8.7 Server instance. You will primarily work as the `devops` user with occasional privileged commands via `sudo` when you need to perform installations or customizations.
+
+
+== Installing Rust
+
+We'll start by setting up Rust initially for local, Linux x86, development and then add WebAssembly target support and `wasmedge`.
+
+WARNING: Do not perform this as `root`, make sure you are the `devops` user either via the `id` command or visually checking your prompt looks like this: `[devops@bastion ~] $`
+
+. Install Rust
++
+[{format_cmd_output}]
+----
+$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+----
++
+.Sample Output
+[source,textinfo]
+----
+... <Truncated>
+
+  /home/devops/.bash_profile
+  /home/devops/.bashrc
+  /home/devops/.zshenv
+
+You can uninstall at any time with rustup self uninstall and
+these changes will be reverted.
+
+Current installation options:
+
+
+   default host triple: x86_64-unknown-linux-gnu
+     default toolchain: stable (default)
+               profile: default
+  modify PATH variable: yes
+
+1) Proceed with installation (default)
+2) Customize installation
+3) Cancel installation
+>
+----
+
++
+. Select Option 1
++
+.Sample Output
+[source,textinfo]
+----
+... <Truncated>
+ stable-x86_64-unknown-linux-gnu installed - rustc 1.68.0 (2c8cc3432 2023-03-06)
+
+
+Rust is installed now. Great!
+
+To get started you may need to restart your current shell.
+This would reload your PATH environment variable to include
+Cargo's bin directory ($HOME/.cargo/bin).
+
+To configure your current shell, run:
+source "$HOME/.cargo/env"
+----
++
+. Setup your current shell environment (future logins will get this for free via `~/.bashrc`)
++
+[{format_cmd_output}]
+----
+$ source "$HOME/.cargo/env"
+----
++
+. Validate your Rust environment
++
+[{format_cmd_output}]
+----
+$ type rustup cargo
+----
++
+.Sample Output
+[source,textinfo]
+----
+rustup is /home/devops/.cargo/bin/rustup
+cargo is /home/devops/.cargo/bin/cargo
+----
+
+
+== Create a Simple Rust Application
+
+In this section we'll validate our Rust setup actually works before, in the next section extending it to support *wasm*.
+
+. Create a new Rust application
++
+[{format_cmd_output}]
+----
+$ cargo new --bin hello-rhel
+----
++
+.Sample Output
+[source,textinfo]
+----
+    Created binary (application) `hello-rhel` package
+----
++
+. `cd` into your working directory
++
+[{format_cmd_output}]
+----
+$ cd hello-rhel
+----
++
+. `tree` will show you your application structure
++
+[{format_cmd_output}]
+----
+$ tree
+----
++
+.Sample Output
+[source,textinfo]
+----
+.
+├── Cargo.toml
+└── src
+    └── main.rs
+----
++
+. Examine your source file
++
+[{format_cmd_output}]
+----
+$ cat src/main.rs
+----
++
+.Sample Output
+[source,textinfo]
+----
+fn main() {
+    println!("Hello, world!");
+}
+----
++
+For now we will leave this very simple "Hello World" as is. Later we will create slightly more complex applications.
++
+. Build your application, for now a simple Linux x86 binary will do.
++
+[{format_cmd_output}]
+----
+$ cargo build --release
+----
++
+.Sample Output
+[source,textinfo]
+----
+Compiling hello-rhel v0.1.0 (/home/devops/hello-rhel)
+    Finished release [optimized] target(s) in 0.61s
+----
+. Finally run your application
++
+[{format_cmd_output}]
+----
+$  ./target/release/hello-rhel
+----
++
+.Sample Output
+[source,textinfo]
+----
+Hello, world!
+----
+
+=== Summary
+
+So now we have a simple Rust development environment which can build Linux x86 applications.
+
+== Extend Rust to support WebAssembly and Linux to run `.wasm` files
+
+In this section we'll extend our Rust environment to add WebAssembly support and then install `wasmedge` as our WebAssembly runtime of choice. Other runtimes are available but later we will see how `wasmedge` integrates well with out Container runtime ecosystem.
+
+
+NOTE: As mentioned in the introduction this is not a development workshop as such. There are plenty of excellent Rust resources available introducing Rust development, `cargo`, `rustup` etc. It is worth mentioning that Rust has excellent support for WebAssembly. A good staring point is link:https://doc.rust-lang.org/stable/book/[_"The Rust Book"_]
+
+. First we have to add WebAssembly as a Rust target via `rustup`
++
+[{format_cmd_output}]
+----
+$ rustup target add wasm32-wasi
+----
++
+.Sample Output
+[source,textinfo]
+----
+info: downloading component 'rust-std' for 'wasm32-wasi'
+info: installing component 'rust-std' for 'wasm32-wasi'
+ 19.6 MiB /  19.6 MiB (100 %)   8.8 MiB/s in  2s ETA:  0s
+----
++
+. Now compile your application to a `.wasm` bytecode file.
++
+[{format_cmd_output}]
+----
+$ cargo build --target wasm32-wasi --release
+----
++
+.Sample Output
+[source,textinfo]
+----
+cargo build --target wasm32-wasi --release
+   Compiling hello-rhel v0.1.0 (/home/devops/hello-rhel)
+    Finished release [optimized] target(s) in 0.23s
+----
++
+. Examine your new `.wasm` file
++
+[{format_cmd_output}]
+----
+$ ls -l target/wasm32-wasi/release/hello-rhel.wasm
+----
++
+.Sample Output
+[source,textinfo]
+----
+-rwxr-xr-x. 2 devops users 2109576 Mar 18 14:27 target/wasm32-wasi/release/hello-rhel.wasm
+----
+
+At this point we now have our first `.wasm` file but no way of running it. In the next section we will add `wasmedge`.
+
+== Setting up Linux with a WebAssembly Runtime
+
+
+. Use RHEL's `dnf` package manager to install `wasmedge`
++
+[{format_cmd_output}]
+----
+$ sudo dnf install -y wasmedge
+----
++
+.Sample Output
+[source,textinfo]
+----
+... <TRUNCATED>
+
+Installed:
+  fmt-6.2.1-1.el8.x86_64                                           lld-14.0.6-1.module+el8.7.0+15816+ec020e8f.x86_64
+  lld-libs-14.0.6-1.module+el8.7.0+15816+ec020e8f.x86_64           llvm-14.0.6-1.module+el8.7.0+15816+ec020e8f.x86_64
+  llvm-libs-14.0.6-1.module+el8.7.0+15816+ec020e8f.x86_64          spdlog-1.5.0-2.el8.x86_64
+  wasmedge-0.11.2-1.el8.x86_64
+
+Complete!
+----
++
+. Now test your with your existing `.wasm` file
++
+[{format_cmd_output}]
+----
+$ wasmedge ./target/wasm32-wasi/release/hello-rhel.wasm
+----
++
+.Sample Output
+[source,textinfo]
+----
+Hello, world!
+----
+
+== Conclusion
+
+We now have a working Rust and WebAssembly environment which we can extend to work with OCI and Containers. In the next lab we'll install container runtime toolchain with WebAssembly support.
+
+We have:
+
+* A working Rust Development toolchain
+*
+
+
+// TODO: Add text to install your own favorite toolchain?
+
+
+This concludes a short exercise with Web Console. Feel free to click through and explore other sections:
+
+* Under *Accounts* section, you can manage user accounts on your RHEL 9 server
+* *Diagnostic Reports* allows you to create sosreport for Red Hat support
+* Under *Kernel Dump*, you can enable/disable kdump
+
+You will get an opportunity to manager Virtual Machines and Build System Images in later exercises.
+
+== Additional Resources
+
+You can find more information:
+
+    * link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_systems_using_the_rhel_9_web_console/index[Managing Systems Using the Web Console]
+
+[discrete]
+== End of Unit
+
+ifdef::env-github[]
+link:../RHEL9-Workshop.adoc#toc[Return to TOC]
+endif::[]
+
+////
+Always end files with a blank line to avoid include problems.
+////

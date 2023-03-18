@@ -4,31 +4,46 @@
 :show_solution: true
 
 [discrete]
-== Presented By
+== Delivered By
 
-  * Christoph Doerbeck
-  * Eddie Chen
-  * Gordon Keegan
-  * Lynn Dixon
+  * Tony Kay (tok@redhat.com)
+ 
+
+=== Acknowledgments
+
+  * Ivan Font (Red Hat) - extensive work providing much of the material
+  ** link:
 
 == Overview
 
-First of all, THANK YOU for registering and participating in *The Definitive Red Hat Enterprise Linux 9 Hands-on Lab*.  
-This hands-on lab will lead you through a mix of self-paced and proctored exercises covering core and updated capabilities of RHEL 9.
+First of all, THANK YOU for choosing to participate in this *WebAssembly and OCI - Better Together Workshop*.
+These hands-on lab will lead you through a series of self-paced labs focussed on different areas of using wasm with OCI technologies.
+
+
+
+ and proctored exercises covering core and updated capabilities of RHEL 9.
 The lab team has worked very hard to assemble a series of exercises to introduce many of the new features and capabilities 
 found in this release.  We hope you enjoy this experience and please don't hesitate to ask questions.  
 
-=== Words of Caution
 
-WARNING: As an administrator, you are capable of ruining your environment.  We strongly encourage you
+
+=== Disclaimers!
+
+NOTE: This is not a WebAssembly, or wasm, development workshop. It is focussed on using wasm and OCI technologies together and highlighting both advantages and trade-offs of this approach.
+
+* Building pure WebAssembly Container Images
+** i.e. Single layer `.wasm` artifacts only
+* Running 
+* Introducing 
+* Building pure WebAssembly Container Images
+** i.e. Single layer `.wasm` artifacts only
+
+
+
+Nor is it As an administrator, you are capable of ruining your environment.  We strongly encourage you
 to stick to the exercises as prescribed.  Recovery of your environment is unlikely due to limited time and resources.
 
 WARNING: We only test with Firefox and/or Google Chrome.  Your mileage will vary using MacOS Safari or Windows Explorer.
-
-
-=== Workshop Feedback
-
-Please don't forget to review this session at the completion of this lab.  Your reviews and feedback help keep labs like these as top attractions for the Red Hat Summit.
 
 === Workshop Source
 

@@ -5,9 +5,9 @@ modules:
     exit_sign: "Workshop Overview"
   overview:
     name:      "Workshop Overview"
-    exit_sign: "Web Console (cockpit)"
-  documentation/webconsole:
-    name:      "Web Console (cockpit)"
+    exit_sign: "Getting Setup"
+  documentation/getting-setup:
+    name:      "Getting Setup"
     exit_sign: "Service Management (systemd)"
   documentation/systemd:
     name:      "Service Management (systemd)"
