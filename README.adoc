@@ -1,5 +1,13 @@
 :markup-in-source: verbatim,attributes,quotes
 
+= Bookbag lab for "WebAssembly and OCI - Better Together"
+
+* First written for WASM IO 2023 Barcelona March 2023
+
+== Resources
+
+* 
+
 
 
 = Bookbag Template
