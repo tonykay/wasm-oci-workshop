@@ -4,8 +4,8 @@ modules:
   activate:
     - connection
     - overview
-    - documentation/getting-setup
+    - documentation/setup-rust-wasm
     - documentation/webassembly-container-toolchain
+    - documentation/webassembly-container-build-and-run
     - documentation/podman
     - documentation/buildah
-    - documentation/leapp

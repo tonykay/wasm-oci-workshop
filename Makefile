@@ -34,9 +34,12 @@ run: ##
 	$(CONTAINER_ENGINE) run \
 		--rm \
 		--name $(IMAGE_NAME) \
+		--platform linux/amd64 \
 		-p $(BOOKBAG_EXTERNAL_PORT):10080 \
 		-d $(IMAGE_NAME):$(TAG) \
 	$(EXTRA_ARGS)
+
+clean: kill build run
 
 all: build run
 

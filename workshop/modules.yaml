@@ -5,19 +5,19 @@ modules:
     exit_sign: "Workshop Overview"
   overview:
     name:      "Workshop Overview"
-    exit_sign: "Getting Setup"
-  documentation/getting-setup:
-    name:      "Getting Setup"
+    exit_sign: "Setting up Rust and wasm"
+  documentation/setup-rust-wasm:
+    name:       "Setting up Rust and wasm"
     exit_sign: "WebAssembly Container Toolchain"
   documentation/webassembly-container-toolchain:
     name:      "WebAssembly Container Toolchain"
+    exit_sign: "WebAssembly Container Build and Run"
+  documentation/webassembly-container-build-and-run:
+    name:      "WebAssembly Container Build and Run"
     exit_sign: "Containers Management (podman)"
   documentation/podman:
-    name:      "Containers Management (podman)"
+    name:      "Bonus: Containers Management (podman)"
     exit_sign: "Containers Dev (buildah)"
   documentation/buildah:
-    name:      "Containers Dev (buildah)"
-    exit_sign: "LEAPP In-Place Upgrades"
-  documentation/leapp:
-    name:      "LEAPP In-Place Upgrades"
+    name:      "Bonus: Containers Dev (buildah)"
     exit_sign: "Finish Workshop"
