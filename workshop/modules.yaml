@@ -11,9 +11,12 @@ modules:
     exit_sign: "WebAssembly Container Toolchain"
   documentation/webassembly-container-toolchain:
     name:      "WebAssembly Container Toolchain"
-    exit_sign: "WebAssembly Container Build and Run"
-  documentation/webassembly-container-build-and-run:
-    name:      "WebAssembly Container Build and Run"
+    exit_sign: "WebAssembly Container Build"
+  documentation/webassembly-container-build:
+    name:      "WebAssembly Container Build"
+    exit_sign: "WebAssembly Container Run"
+  documentation/webassembly-container-run:
+    name:      "WebAssembly Container Run"
     exit_sign: "Containers Management (podman)"
   documentation/podman:
     name:      "Bonus: Containers Management (podman)"

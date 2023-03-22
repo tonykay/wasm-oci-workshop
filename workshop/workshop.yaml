@@ -6,6 +6,7 @@ modules:
     - overview
     - documentation/setup-rust-wasm
     - documentation/webassembly-container-toolchain
-    - documentation/webassembly-container-build-and-run
+    - documentation/webassembly-container-build
+    - documentation/webassembly-container-run
     - documentation/podman
     - documentation/buildah

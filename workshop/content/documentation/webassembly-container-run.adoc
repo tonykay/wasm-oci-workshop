@@ -1,0 +1,252 @@
+:sectnums:
+:sectnumlevels: 3
+:markup-in-source: verbatim,attributes,quotes
+:imagesdir: ./_images/cockpit-rhel90
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+:ssh_username: <Provided-By-Instructor>
+:ssh_password: <Provided-By-Instructor>
+:targethost_fqdn: <Provided-By-Instructor>
+:subdomain: example.com
+:format_cmd_exec: source,options="nowrap",subs="{markup-in-source}",role="copy"
+:format_cmd_output: bash,options="nowrap",subs="{markup-in-source}"
+ifeval::["%cloud_provider%" == "ec2"]
+:ssh_password: %ssh_password%
+:ssh_username: %ssh_username%
+:targethost_fqdn: %targethost%
+:subdomain: %subdomain_internal%
+:format_cmd_exec: source,options="nowrap",subs="{markup-in-source}",role="execute"
+endif::[]
+
+
+:toc:
+:toclevels: 1
+
+=  Part 1: Running `wasm`` Container Images
+
+In our last lab we built a simple `wasm` OCO image and it was remarkably straightforward, in fact simpler than the normal _"container development cycle"_ selecting base images, resolving dependencies, multiple ADDs, and cleaning up cruft left behind. The same basic 3 line Containerfile can be used over and over again with a simple path modification. Later we will do another simple build.
+
+In this section we will run our image, and take a dive under the covers to see what is actually happening during this process.
+
+. In our last lab we built the image with `buildah` which works together with `podman`. Can `podman` see our image?
++
+
+[{format_cmd_output}]
+----
+podman image ls
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+REPOSITORY                     TAG         IMAGE ID      CREATED         SIZE
+docker.io/tonykay/http_server  0.1.0       90f76b4ff84f  20 minutes ago  2.25 MB
+----
+
+. Let's compare the size to our original `.wasm` Byte Code
++
+NOTE: Paths assume you are still in the `/home/devops/wasm-oci-source-code-examples/wasmedge_wasi_socket/examples/http_server` directory.
++
+
+[{format_cmd_output}]
+----
+$ ls -l target/wasm32-wasi/release/http_server.wasm
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+-rwxr-xr-x. 2 devops users 2246990 Mar 21 16:21 target/wasm32-wasi/release/http_server.wasm
+----
++
+
+As you can see the OCI image has not _put on weight_ or added other externalities. We will inspect the image in more depth shortly but let's first run it.
+
+. Use `podman` to run the image "as normal". Podman largely shares CLI compatibility with Docker differing where they diverge (Docker has inbuilt support for Compose whilst for example Podman supports Pods, Kube, and Systemd)
++
+
+[{format_cmd_output}]
+----
+$ podman run --rm --name http_server -d -p 1234:1234 http_server:0.1.0 
+----
++
+NOTE: You can drop the `<REGISTRY>/<REPO>` syntax in the image name for short ie `podman` will resolve `http_server:0.1.0` without, in my case, `quay.io/tonykay/http_server:0.1.0`
++
+
+.Sample Output
+[source,textinfo]
+----
+WARNING: image platform (wasm/wasi) does not match the expected platform (linux/amd64)
+ff93e258e3c9f2b69033a2ebc31c9773bd9e1627f8564c78b1afa3c875087ab0
+----
++
+
+You can ignore the warning, and expect this to go away in time. You can read more link:https://github.com/opencontainers/image-spec/blob/main/image-index.md#image-index-property-descriptions[here]. In fact we could have omitted the `--platform wasm/wasi` from the buildah command in the buildah command in the last lab. What is important is that your OCI image will run anywhere you have an OCI runtime capable of executing the `.wasm` payload within the image.
+
+. Before we examine how this image is actually being run bu `podman` let's quickly validate it actually works. The `http-server` listens on port `1234` by default and simply echos any payload sent to it. In our `podman run command we mapped that to `localhost:1234`
++
+WARNING: Docker users may be tempted to do something like this, and map it to a default port, `-p 80:1234`. This will *not* work. Podman is running under your normal user id (UID) so of course does not have the privilege to open a privileged port below 1024. Be aware the Podman's model is far more secure by default so some Docker patterns will not work. By default Docker has deamons running as root whereas Podman works on a completely different deamonless architecture (`fork/exec`) without non explicit privilege escalation.
++
+
+[{format_cmd_output}]
+----
+$  curl -s -X POST http://127.0.0.1:1234 -d '{ "Event" : "WASM IO 2023 BCN" }' | jq
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+{
+  "Event": "WASM IO 2023 BCN"
+}
+----
+
+== Under the Covers
+
+So lets take a look at how Podman invoked a wasmedge runtime without it being embedded within the actual container itself. As just mentioned Podman does not have a daemon running and instead irrespective of the type of container eg say `linux/amd64` or `wasm/wasi` etc it `fork/exec` into OCI Compliant runtime `crun`.
+
+This has significant advantages over the daemon model including:
+
+* Security - `crun` inherits the user, and not root, privileges
+* Security - eliminates root privileged daemon(s) listening with API endpoints 
+* Namespacing - User namespacing is now possible as the UID is inherited
+* Speed - eliminates multiple API calls for 2 fork/exec operations
+** It is beyond the scope of this lab but `crun` is written in C and is both faster and better suited to fork/exec than equivalents such as the Go based `runc`
++
+
+[{format_cmd_output}]
+----
+$  ps -ef | grep wasm
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+devops      7382    7380  0 12:24 ?        00:00:00 [libcrun:wasmedge] /http_server.wasm
+----
++
+
+Actually we cheated with that command and used prior knowledge that somehow `wasmedge` would be invoked and come to life to run our image. So to find what actually happened rerun that search but this time looking for `crun` itself.
++
+
+WARNING: If you have been playing a bit with `podman` and have several Containers running it will help if you kill them with `podman kill` otherwise the large output will be confusing.
++
+
+[{format_cmd_output}]
+----
+$  ps -ef | grep crun
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+devops      7380       1  0 12:24 ?        00:00:00 /usr/bin/conmon --api-version 1 -c ff93e258e3c9f2b69033a2ebc31c9773bd9e1627f8564c78b1afa3c875087ab0 -u ff93e258e3c9f2b69033a2ebc31c9773bd9e1627f8564c78b1afa3c875087ab0 -r /usr/bin/crun -b /home/devops/.local/share/containers/storage/overlay-containers/ff93e258e3c9f2b69033a2ebc31c9773bd9e1627f8564c78b1afa3c875087ab0/userdata -p /run/user/1001/containers/overlay-containers/ff93e258e3c9f2b69033a2ebc31c9773bd9e1627f8564c78b1afa3c875087ab0/userdata/pidfile -n http_server --exit-dir /run/user/1001/libpod/tmp/exits --full-attach -l k8s-file:/home/devops/.local/share/containers/storage/overlay-containers/ff93e258e3c9f2b69033a2ebc31c9773bd9e1627f8564c78b1afa3c875087ab0/userdata/ctr.log --log-level warning --runtime-arg --log-format=json --runtime-arg --log --runtime-arg=/run/user/1001/containers/overlay-containers/ff93e258e3c9f2b69033a2ebc31c9773bd9e1627f8564c78b1afa3c875087ab0/userdata/oci-log --conmon-pidfile /run/user/1001/containers/overlay-containers/ff93e258e3c9f2b69033a2ebc31c9773bd9e1627f8564c78b1afa3c875087ab0/userdata/conmon.pid --exit-command /usr/bin/podman --exit-command-arg --root --exit-command-arg /home/devops/.local/share/containers/storage --exit-command-arg --runroot --exit-command-arg /run/user/1001/containers --exit-command-arg --log-level --exit-command-arg warning --exit-command-arg --cgroup-manager --exit-command-arg cgroupfs --exit-command-arg --tmpdir --exit-command-arg /run/user/1001/libpod/tmp --exit-command-arg --network-config-dir --exit-command-arg  --exit-command-arg --network-backend --exit-command-arg netavark --exit-command-arg --volumepath --exit-command-arg /home/devops/.local/share/containers/storage/volumes --exit-command-arg --db-backend --exit-command-arg boltdb --exit-command-arg --transient-store=false --exit-command-arg --runtime --exit-command-arg crun --exit-command-arg --storage-driver --exit-command-arg overlay --exit-command-arg --events-backend --exit-command-arg file --exit-command-arg container --exit-command-arg cleanup --exit-c
+devops      7382    7380  0 12:24 ?        00:00:00 [libcrun:wasmedge] /http_server.wasm
+----
++
+
+So fortunately we don't have to discuss the `conmon` arguments one by one! Though there is some interesting stuff there if you ever want to dive deeper into the internals of Container runtimes and how they come to life. But was is `conmon` and it's role? 
++
+
+As mentioned earlier `podman` is daemonless and what we see here is a chain of fork/execs.
++
+* `podman` -> `conmon` (podman now exits)
+* `conmon` -> `crun` (above)
+* `crun` -> `[libcrun:wasmedge] /http_server.wasm`
++
+
+The obvious question is how did `crun` know to not try to start http_server as a normal or traditional container? Recall our earlier build with `buildah`, we annotated the build with our runtime information `--annotation "run.oci.handler=wasmedge"`
+
+= Part 2 - Inspecting the Image
+
+Before we leave this part to move onto Signing and Pushing to an OCI registry lets inspect the image in a bit more depth.
+
+. Inspect the image with `podman`
++
+
+[{format_cmd_output}]
+----
+$ podman inspect http_server:0.1.0 | less
+----
++
+
+This will allow you to browse through the image inspection. The following commands with `jq` can allow us to isolate the more interesting points for our current lab:
++
+
+[{format_cmd_output}]
+----
+$ podman inspect http_server:0.1.0 | jq '.[].Annotations'
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+{
+  "org.opencontainers.image.base.digest": "",
+  "org.opencontainers.image.base.name": "",
+  "run.oci.handler": "wasmedge"
+}
+----
++
+
+Note the `wasmedge` annotation for the self explanatory `run.oci.handler` label
++
+
+[{format_cmd_output}]
+----
+$ podman inspect http_server:0.1.0 | jq '.[].Config.Cmd'
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+[
+  "/http_server.wasm"
+]
+----
++
+
+We have our Command for `[libcrun:wasmedge] /http_server.wasm` 
+
+
+. OCI images often have many layers, though huge chained ADDs and 2 stage builds can be used to reduce those. In fact Java is a classic example that lends itself to a 2 stage build where 1 image builds say the Java `.jar` before it is copied to a lighter runtime image containing the image.
++
+NOTE: It is perfectly possible to do this for WebAssembly and in some cases may well make sense. For example todays (March 2023) Kubernetes clusters and most *shipping* Container Engines including Podman and Docker (without enabling certain options) cannot yet run the image we built. For maximum compatibility a traditional container could carry both the `.wasm` payload and the appropriate runtime. Expect a lot of changes here in 2023 as vendors incorporate upstream technology such as what we are looking at currently.
++ 
+[{format_cmd_output}]
+----
+$ podman inspect http_server:0.1.0 | jq '.[].RootFS'
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+{
+  "Type": "layers",
+  "Layers": [
+    "sha256:a614659687ce7af787137b54aabdb8ff9680081b7acee20b0d9601da55dd5ef8"
+  ]
+}
+----
++
+
+And there we can see our simple 1 layer image, carrying nothing but the `.wasm` payload we build earlier with Rust.
+
+
+= Summary
+
+So we now have a running OCI Container image with our `.wasm` payload. Next we want to push it to a registry, but first we should sign it and guarantee it's authenticity.
+
