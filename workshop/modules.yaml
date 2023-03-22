@@ -17,6 +17,12 @@ modules:
     exit_sign: "WebAssembly Container Run"
   documentation/webassembly-container-run:
     name:      "WebAssembly Container Run"
+    exit_sign: "WebAssembly Container Push"
+  documentation/webassembly-container-push:
+    name:      "WebAssembly Container Push"
+    exit_sign: "WebAssembly Container Benchmarking"
+  documentation/webassembly-container-benchmarking:
+    name:      "WebAssembly Container Benchmarking"
     exit_sign: "Containers Management (podman)"
   documentation/podman:
     name:      "Bonus: Containers Management (podman)"

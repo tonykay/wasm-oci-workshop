@@ -1,0 +1,212 @@
+:sectnums:
+:sectnumlevels: 3
+:markup-in-source: verbatim,attributes,quotes
+:imagesdir: ./_images/cockpit-rhel90
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+:ssh_username: <Provided-By-Instructor>
+:ssh_password: <Provided-By-Instructor>
+:targethost_fqdn: <Provided-By-Instructor>
+:subdomain: example.com
+:format_cmd_exec: source,options="nowrap",subs="{markup-in-source}",role="copy"
+:format_cmd_output: bash,options="nowrap",subs="{markup-in-source}"
+ifeval::["%cloud_provider%" == "ec2"]
+:ssh_password: %ssh_password%
+:ssh_username: %ssh_username%
+:targethost_fqdn: %targethost%
+:subdomain: %subdomain_internal%
+:format_cmd_exec: source,options="nowrap",subs="{markup-in-source}",role="execute"
+endif::[]
+
+
+:toc:
+:toclevels: 1
+
+= Signing and Pushing our OCI WebAssembly Container Image
+
+
+== Sigstore
+
+In this lab we will first sign our image with `sigstore` before pushing the signed artifact into a remote OCI Registry.
+
+Time prevents us from anything other than a light dive into Sigstore but I highly recommend the following resources as Software Supply Chain concerns rise in prominence:
+
+* link:https://www.sigstore.dev/[Sigstore]
+* Several articles
+** link:https://www.redhat.com/en/blog/sigstore-open-answer-software-supply-chain-trust-and-security[Sigstore: An open answer to software supply chain trust and security]
+** link:https://containerjournal.com/features/sigstore-sets-out-to-secure-cloud-native-supply-chain/[Sigstore Sets Out to Secure Cloud-Native Supply Chain]
+** link:https://www.csoonline.com/article/3662782/sigstore-explained-how-it-helps-secure-the-software-supply-chain.html[Sigstore explained: How it helps secure the software supply chain]
+
+== WebAssembly Security
+
+A minor digression. WebAssembly is often touted as being "secure", primarily on the back of both its strong Capability Based Security Model, its lack of native IO, and a freedom from the manual memory management that have so haunted C and C++.
+
+However whilst WebAssembly has a great start, ike any technology it is not completely *secure* and researchers are already finding more and more vulnerabilities in it's design. As WebAssembly continues to rise in adoption almost certainly more attention will turn to WebAssembly security.
+
+It is commonplace to scan Container Images for vulnerabilities with tools such as clair, trivvy, sfyt, grype etc but our `.wasm` image presents an interesting challenge. There are no Python, npm, Java libraries inside to compare to a vulnerability database and even if certain "known bad" libraries are used upstream in the creation of our `.wasm` artifact their signatures have long been stripped away. How `.wasm` scanning plays out over the coming years remains to be seen.
+
+So, as good citizens within our community, lets at least sign out image via Sigstore and allow it to be attributed back to its creator with certainty.
+
+== Part 1: Signing our OCI WebAssembly Container Image
+
+This lab draws heavily on (aka copies it) Red Hat's documentation here link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/building_running_and_managing_containers/assembly_signing-container-images_building-running-and-managing-containers#proc_signing-container-images-with-sigstore-signatures_assembly_signing-container-images[Signing container images with sigstore signatures] though a couple of minor modifications were needed.
+
+
+First we need to compile Si
+
+. First ensure you are in your home directory with a simple `cd`
++
+[{format_cmd_output}]
+----
+$ cd
+----
+
+. We will clone the Sigstore repo and `cd` into it
++
+
+[{format_cmd_output}]
+----
+$ git clone https://github.com/sigstore/cosign
+$ cd cosign
+----
+
+. Build `cosign` with `make` - notice it is Golang as the build process executes
++
+[{format_cmd_output}]
+----
+$ make ./cosign
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+... <TRUNCATED>
+
+go: downloading github.com/agnivade/levenshtein v1.1.1
+go: downloading github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
+go: downloading github.com/golang/glog v1.0.0
+go: downloading github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb
+go: downloading github.com/emicklei/go-restful/v3 v3.8.0
+----
+
+. Make a safe place for your keys - _it's probaly not a good idea to keep them in that repo_
++
+
+[{format_cmd_output}]
+----
+$ cd
+$ mkdir sigstore_keys
+$ cd sigstore_keys
+----
+
+. Generate your public and private key pair, entering your choice of password
++
+
+[{format_cmd_output}]
+----
+~/cosign/cosign generate-key-pair
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+Enter password for private key:
+Enter password for private key again:
+Private key written to cosign.key
+Public key written to cosign.pub
+----
+
+WARNING: As of 2023-03-22 there is a link:https://github.com/sigstore/cosign/commit/6c41101a4ead4c97e1f2e84c81d615b15584b89b[bug], thanks Andrew Block (Red Hat) for diagnosing the issue fast. Basically the *PRIVATE* `cosign.key` has headers and footers with the string `ENCRYPTED SIGSTORE PRIVATE KEY` instead of `ENCRYPTED COSIGN PRIVATE KEY`. If this is still the case you need to fix it.
+
+. Fix the short term `cosign.key` issue
++
+[{format_cmd_output}]
+----
+$ perl -pi -e 's/SIGSTORE/COSIGN/' cosign.key
+----
+
+
+. Now you need to add *your* registry details to `/etc/containers/registries.d/default.yaml`
++
+
+Both `vim` and `nano` are installed and feel free to install any editor of choice. Your server is connected to EPEL and many packages will just install with a simple `sudo dnf install -y <PACKAGE-NAME>`. In fact `sudo dnf install -y emacs` works. For `neovim` fans that is also installed also and gives a more polished experience. And yes `<ESC> ZZ` will get you out of vim and its descendants whilst also saving!
++
+
+In my example I add `quay.io`
++
+
+[{format_cmd_output}]
+----
+$ sudo vim /etc/containers/registries.d/default.yaml
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+docker:
+    quay.io:
+        use-sigstore-attachments: true
+----
+
+
+== Part 2: Pushing your signed image
+
+In the simple Part 2 we will sign and push our image
+
+
+. Login to your registry
++
+
+Since you will be pushing your image, you will need to authenticate first to your registry with podman
++
+
+[{format_cmd_output}]
+----
+$  podman login quay.io
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+Username: ......
+Password:
+Login Succeeded!
+----
+
+. Finally, sign and push your image with `podman push --sign-by-sigstore-private-key` entering your key passphrase when requested.
++
+
+NOTE: Remember to change your registry and repo for your image
++
+
+[{format_cmd_output}]
+----
+$ podman push --sign-by-sigstore-private-key ./cosign.key quay.io/tonykay/http_server:0.1.0
+Key Passphrase:
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+Getting image source signatures
+Copying blob a614659687ce done
+Copying config d714464f9e done
+Writing manifest to image destination
+Creating signature: Signing image using a sigstore signature
+Storing signatures
+----
+
+= Summary
+
+So we have now created, built, run, signed, and pushed our OCI WebAssembly image so now for some fun. In our next, Bonus lab, lets see how fast we can run WebAssembly inside and outside the container.
+

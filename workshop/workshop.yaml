@@ -8,5 +8,7 @@ modules:
     - documentation/webassembly-container-toolchain
     - documentation/webassembly-container-build
     - documentation/webassembly-container-run
+    - documentation/webassembly-container-push
+    - documentation/webassembly-container-benchmarking
     - documentation/podman
     - documentation/buildah

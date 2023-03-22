@@ -208,7 +208,7 @@ WARNING: You will want to substitute your own registry details in the command be
 
 [{format_cmd_output}]
 ----
-buildah build --platform wasi/wasm --annotation "run.oci.handler=wasmedge" -t docker.io/tonykay/http_server:0.1.0 .
+buildah build --platform wasm/wasi --annotation "run.oci.handler=wasmedge" -t docker.io/tonykay/http_server:0.1.0 .
 ----
 +
  
@@ -235,7 +235,7 @@ Whilst it's natural to want to go on and run our image and see if it works, lets
 [{format_cmd_output}]
 ----
 buildah build \ <1>
-  --platform wasi/wasm \ <2>
+  --platform wasm/wasi \ <2>
   --annotation "run.oci.handler=wasmedge" \ <3>
   -t docker.io/tonykay/http_server:0.1.0 \ <4>
   . <5>
