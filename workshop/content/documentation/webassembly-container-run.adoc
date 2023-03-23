@@ -29,7 +29,7 @@ endif::[]
 
 =  Part 1: Running `wasm`` Container Images
 
-In our last lab we built a simple `wasm` OCO image and it was remarkably straightforward, in fact simpler than the normal _"container development cycle"_ selecting base images, resolving dependencies, multiple ADDs, and cleaning up cruft left behind. The same basic 3 line Containerfile can be used over and over again with a simple path modification. Later we will do another simple build.
+In our last lab we built a simple `wasm` OCI image and it was remarkably straightforward, in fact simpler than the normal _"container development cycle"_ selecting base images, resolving dependencies, multiple ADDs, and cleaning up cruft left behind. The same basic 3 line Containerfile can be used over and over again with a simple path modification. Later we will do another of these simple builds.
 
 In this section we will run our image, and take a dive under the covers to see what is actually happening during this process.
 
@@ -38,7 +38,7 @@ In this section we will run our image, and take a dive under the covers to see w
 
 [{format_cmd_output}]
 ----
-podman image ls
+$ podman image ls
 ----
 +
 
@@ -90,9 +90,10 @@ ff93e258e3c9f2b69033a2ebc31c9773bd9e1627f8564c78b1afa3c875087ab0
 
 You can ignore the warning, and expect this to go away in time. You can read more link:https://github.com/opencontainers/image-spec/blob/main/image-index.md#image-index-property-descriptions[here]. In fact we could have omitted the `--platform wasm/wasi` from the buildah command in the buildah command in the last lab. What is important is that your OCI image will run anywhere you have an OCI runtime capable of executing the `.wasm` payload within the image.
 
-. Before we examine how this image is actually being run bu `podman` let's quickly validate it actually works. The `http-server` listens on port `1234` by default and simply echos any payload sent to it. In our `podman run command we mapped that to `localhost:1234`
+. Before we examine how this image is actually being run by `podman` let's quickly validate it actually works. The `http-server` listens on port `1234` by default and simply echos any payload sent to it. In our `podman run command we mapped that to `localhost:1234`
 +
-WARNING: Docker users may be tempted to do something like this, and map it to a default port, `-p 80:1234`. This will *not* work. Podman is running under your normal user id (UID) so of course does not have the privilege to open a privileged port below 1024. Be aware the Podman's model is far more secure by default so some Docker patterns will not work. By default Docker has deamons running as root whereas Podman works on a completely different deamonless architecture (`fork/exec`) without non explicit privilege escalation.
+
+WARNING: Docker users may be tempted to do something like this, and map it to a default port, `-p 80:1234`. This will *not* work. Podman is running under your normal user id (UID) so of course does not have the privilege to open a privileged port below 1024. Be aware the Podman's model is far more secure by default so some Docker patterns will not work. By default Docker has daemons running as root whereas Podman works on a completely different daemonless architecture (`fork/exec`) without non explicit privilege escalation (rootful mode).
 +
 
 [{format_cmd_output}]
@@ -111,7 +112,7 @@ $  curl -s -X POST http://127.0.0.1:1234 -d '{ "Event" : "WASM IO 2023 BCN" }' |
 
 == Under the Covers
 
-So lets take a look at how Podman invoked a wasmedge runtime without it being embedded within the actual container itself. As just mentioned Podman does not have a daemon running and instead irrespective of the type of container eg say `linux/amd64` or `wasm/wasi` etc it `fork/exec` into OCI Compliant runtime `crun`.
+So lets take a look at how Podman invoked a wasmedge runtime without it being embedded within the actual container itself. As just mentioned Podman does not have a daemon running and instead irrespective of the type of container eg say `linux/amd64` or `wasm/wasi` etc it will `fork/exec` its way into OCI Compliant runtime `crun`.
 
 This has significant advantages over the daemon model including:
 
@@ -160,12 +161,16 @@ So fortunately we don't have to discuss the `conmon` arguments one by one! Thoug
 
 As mentioned earlier `podman` is daemonless and what we see here is a chain of fork/execs.
 +
+
 * `podman` -> `conmon` (podman now exits)
-* `conmon` -> `crun` (above)
+* `conmon` -> `crun` (above output)
 * `crun` -> `[libcrun:wasmedge] /http_server.wasm`
 +
 
-The obvious question is how did `crun` know to not try to start http_server as a normal or traditional container? Recall our earlier build with `buildah`, we annotated the build with our runtime information `--annotation "run.oci.handler=wasmedge"`
+An obvious question is how did `crun` know to not try to start http_server as a normal or traditional container, and instead fork/exec `[libcrun:wasmedge]`? 
++
+
+Recall our earlier build with `buildah`, we annotated the build with our runtime information `--annotation "run.oci.handler=wasmedge"`
 
 = Part 2 - Inspecting the Image
 
@@ -182,7 +187,7 @@ $ podman inspect http_server:0.1.0 | less
 
 This will allow you to browse through the image inspection. The following commands with `jq` can allow us to isolate the more interesting points for our current lab:
 +
-
+.Output the annotations
 [{format_cmd_output}]
 ----
 $ podman inspect http_server:0.1.0 | jq '.[].Annotations'
@@ -203,6 +208,7 @@ $ podman inspect http_server:0.1.0 | jq '.[].Annotations'
 Note the `wasmedge` annotation for the self explanatory `run.oci.handler` label
 +
 
+.Output the Command - how to run the image
 [{format_cmd_output}]
 ----
 $ podman inspect http_server:0.1.0 | jq '.[].Config.Cmd'
@@ -218,13 +224,14 @@ $ podman inspect http_server:0.1.0 | jq '.[].Config.Cmd'
 ----
 +
 
-We have our Command for `[libcrun:wasmedge] /http_server.wasm` 
+We now have our Command for `[libcrun:wasmedge] /http_server.wasm` 
 
 
 . OCI images often have many layers, though huge chained ADDs and 2 stage builds can be used to reduce those. In fact Java is a classic example that lends itself to a 2 stage build where 1 image builds say the Java `.jar` before it is copied to a lighter runtime image containing the image.
 +
 NOTE: It is perfectly possible to do this for WebAssembly and in some cases may well make sense. For example todays (March 2023) Kubernetes clusters and most *shipping* Container Engines including Podman and Docker (without enabling certain options) cannot yet run the image we built. For maximum compatibility a traditional container could carry both the `.wasm` payload and the appropriate runtime. Expect a lot of changes here in 2023 as vendors incorporate upstream technology such as what we are looking at currently.
 + 
+.Output the layer(s)
 [{format_cmd_output}]
 ----
 $ podman inspect http_server:0.1.0 | jq '.[].RootFS'

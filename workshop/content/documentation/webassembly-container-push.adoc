@@ -29,8 +29,7 @@ endif::[]
 
 = Signing and Pushing our OCI WebAssembly Container Image
 
-
-== Sigstore
+== Signing with Sigstore
 
 In this lab we will first sign our image with `sigstore` before pushing the signed artifact into a remote OCI Registry.
 
@@ -46,11 +45,11 @@ Time prevents us from anything other than a light dive into Sigstore but I highl
 
 A minor digression. WebAssembly is often touted as being "secure", primarily on the back of both its strong Capability Based Security Model, its lack of native IO, and a freedom from the manual memory management that have so haunted C and C++.
 
-However whilst WebAssembly has a great start, ike any technology it is not completely *secure* and researchers are already finding more and more vulnerabilities in it's design. As WebAssembly continues to rise in adoption almost certainly more attention will turn to WebAssembly security.
+However whilst WebAssembly has a great start from a security perspective, like any technology it is not completely *secure* and researchers are already finding more and more vulnerabilities in its design. As WebAssembly continues to rise in adoption almost certainly more attention, good and bad, will turn to WebAssembly security.
 
-It is commonplace to scan Container Images for vulnerabilities with tools such as clair, trivvy, sfyt, grype etc but our `.wasm` image presents an interesting challenge. There are no Python, npm, Java libraries inside to compare to a vulnerability database and even if certain "known bad" libraries are used upstream in the creation of our `.wasm` artifact their signatures have long been stripped away. How `.wasm` scanning plays out over the coming years remains to be seen.
+It is commonplace to scan Container Images for vulnerabilities with tools such as clair, trivy, syft, grype etc but our `.wasm` image presents an interesting challenge. There are no Python, npm, Java libraries inside to compare to a vulnerability database and even if certain "known bad" libraries are used upstream in the creation of our `.wasm` artifact their signatures have long been stripped away. How `.wasm` scanning plays out over the coming years remains to be seen.
 
-So, as good citizens within our community, lets at least sign out image via Sigstore and allow it to be attributed back to its creator with certainty.
+So, as good citizens within our community, lets at least sign our image via Sigstore and allow it to be attributed back to its creator with certainty.
 
 == Part 1: Signing our OCI WebAssembly Container Image
 
@@ -132,7 +131,6 @@ WARNING: As of 2023-03-22 there is a link:https://github.com/sigstore/cosign/com
 $ perl -pi -e 's/SIGSTORE/COSIGN/' cosign.key
 ----
 
-
 . Now you need to add *your* registry details to `/etc/containers/registries.d/default.yaml`
 +
 
@@ -170,7 +168,7 @@ Since you will be pushing your image, you will need to authenticate first to you
 
 [{format_cmd_output}]
 ----
-$  podman login quay.io
+$ podman login quay.io
 ----
 +
 

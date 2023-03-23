@@ -32,15 +32,16 @@ endif::[]
 
 == Overview
 
-In this lab we'll extend our Rust and WebAssembly environment to enable building and running WebAssembly `.wasm` Images via an external wasm runtime.
+In this lab we'll extend our Rust and WebAssembly environment to enable building and running WebAssembly `.wasm` images via Podman Container Engine.
 
 == Installing your OCI and Container Toolchain
 
 In this section we will install upstream versions of:
 
-* crun (which will include wasm spport)
 * podman
 * buildah
+* crun  - OCI Container Runtime
+** (which includes wasm support)
 
 Your development environment so far has deliberately *not* been setup with a typical container toolchain. In normal circumstances these are commonly installed and are pulled from official Red Hat repositories. In our case we want to bypass these and use upstream development versions of the toolchain.
 
@@ -185,23 +186,6 @@ NOTE: Again your exact output may vary, however key is that the final line conta
 == Conclusion
 
 We now have both a working Rust and WebAssembly development environment and a Container Toolchain to allow development and running of native WebAssembly Container images. In the next lab we will build several images and run them.
-
-We have:
-
-* A working Rust Development toolchain
-* 
-
-TODO: Cleanup wording
-
-
-== Additional Resources
-
-You can find more information:
-
-    * link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_systems_using_the_rhel_9_web_console/index[Managing Systems Using the Web Console]
-
-[discrete]
-== End of Unit
 
 ifdef::env-github[]
 link:../RHEL9-Workshop.adoc#toc[Return to TOC]

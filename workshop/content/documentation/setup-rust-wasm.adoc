@@ -32,15 +32,13 @@ endif::[]
 
 == Overview
 
-In this lab we'll setup our environment for WebAssembly development with Rust. Your development host is subscribed to a number of repositories that should allow you to customize it and install any favorite tools and languages. 
+In this lab we'll setup our environment for WebAssembly development with Rust. Your development host is subscribed to a number of repositories that should allow you to customize it and install many favorite tools and languages. 
 
 You are welcome to bring your own code and/or `.wasm` artifacts but the proceeded examples are "know good" and have been tested extensively.
 
 WARNING: You have `root` access on your development machine via passwordless sudo `sudo -i` so it is entirely possible to wreak havoc on your environment! Take care when working as `root`. 
 
-
 Your development machine is a Red Hat Enterprise Linux 8.7 Server instance. You will primarily work as the `devops` user with occasional privileged commands via `sudo` when you need to perform installations or customizations.
-
 
 == Installing Rust
 
@@ -306,32 +304,10 @@ We now have a working Rust and WebAssembly environment which we can extend to wo
 We have:
 
 * A working Rust Development toolchain
-*
-
+** Support for `wasm32-wasi` targets
+* Ability to run wasm bytecode via `wasmedge`
 
 // TODO: Add text to install your own favorite toolchain?
-
-
-This concludes a short exercise with Web Console. Feel free to click through and explore other sections:
-
-* Under *Accounts* section, you can manage user accounts on your RHEL 9 server
-* *Diagnostic Reports* allows you to create sosreport for Red Hat support
-* Under *Kernel Dump*, you can enable/disable kdump
-
-You will get an opportunity to manager Virtual Machines and Build System Images in later exercises.
-
-== Additional Resources
-
-You can find more information:
-
-    * link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_systems_using_the_rhel_9_web_console/index[Managing Systems Using the Web Console]
-
-[discrete]
-== End of Unit
-
-ifdef::env-github[]
-link:../RHEL9-Workshop.adoc#toc[Return to TOC]
-endif::[]
 
 ////
 Always end files with a blank line to avoid include problems.

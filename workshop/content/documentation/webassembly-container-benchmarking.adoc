@@ -36,7 +36,7 @@ This is more a fun lab than a scientific one and to make an accurate determinati
 
 One of the current focus areas of WebAssembly is FaaS and how `.wasm` has tremendous potential where fast startup is a key attribute. Of course this lab completely ignores how either raw `.wasm` or wasm containers would be scheduled.
 
-Unfortunately our existing container `http_server` runs as a service so let's build a new image with a shorter runtime.
+Unfortunately our existing container `http_server` runs as a service so let's build a new image with a shorter, more deterministic, runtime.
 
 == Part 1: Building a new image
 
@@ -45,7 +45,7 @@ Unfortunately our existing container `http_server` runs as a service so let's bu
 +
 [{format_cmd_output}]
 ----
-$ cd wasm-oci-source-code-examples/simple_benchmark_test
+$ cd ~/wasm-oci-source-code-examples/simple_benchmark_test
 ----
 +
 
@@ -95,7 +95,7 @@ $ time wasmedge ./target/wasm32-wasi/release/simple_benchmark_test.wasm
 buildah build --platform wasm/wasi --annotation "run.oci.handler=wasmedge" -t quay.io/tonykay/simple_benchmark_test:0.1.0 .
 ----
 +
-NOTE: If you are not planning on pushing the image ten you omit the `<REGISTRY>/<REPO>` in your container name.
+NOTE: If you are not planning on pushing the image then you can omit the `<REGISTRY>/<REPO>` in your container name.
 +
 .Sample Output
 [source,textinfo]
@@ -132,7 +132,7 @@ user    0m0.085s
 sys     0m0.046s
 ----
 
-You will probably see that the Containerized version did in fact take _"a bit longer to run"_ but a couple of runs with time like this is not particularly meaningful. For example `podman` may have already been in memory` whilst `wasmedge` had to be loaded from disk etc. or of course the opposite.
+You will probably see that the Containerized version did in fact take _"a bit longer to run"_ but a couple of runs with time like this is not particularly meaningful. For example `podman` may have already been in memory` whilst `wasmedge` had to be loaded from disk etc., or of course the opposite.
 
 == Part 2: Basic Benchmarks with `hyperfine`
 
@@ -177,171 +177,11 @@ Benchmark 1: podman run --rm --name benchmark simple_benchmark_test:0.1.0
   Range (min … max):   12.235 s … 12.434 s    5 runs
 ----
 
+Certainly on _my machine_ which like yours is most likely a `t3a.medium` running on AWS podman seems only very slightly slower despite having to fork/exec its way to `wasmedge` via `conmon` and `crun`.
+
 = Summary
 
 So hopefully that was a fun and interesting exercise as we saw wasmedge bake off against podman running the containerized version of the same payload.
 
 But as we discussed earlier `podman` is a Container Engine and *not* a Container Runtime, what if we could go straight to `crun`? In our next, also Bonus, lab we'll get `crun` running our OCI image directly which is an interesting exercise in its own right and then performing that simple benchmark.
 
-
-
-
-
-
-
-
-
-
-+
-.Sample Output
-[source,textinfo]
-----
--bash: type: crun: not found
--bash: type: podman: not found
--bash: type: buildah: not found
-----
-+
-NOTE: If these were installed they can simply be removed with `sudo dnf remove -y podman buildah crun`
-+
-. Disable `container-tools`, this will stop your development machine from pulling the official version of packages from Red Hat.
-+
-[{format_cmd_output}]
-----
-$  sudo dnf -y module disable container-tools
-----
-+
-.Sample Output
-[{format_cmd_output}]
-----
-Updating Subscription Management repositories.
-Fast Datapath for RHEL 8 x86_64 (RPMs)                                                         8.2 kB/s | 2.4 kB     00:00
-Red Hat Enterprise Linux 8 for x86_64 - BaseOS (RPMs)                                          7.8 kB/s | 2.4 kB     00:00
-Red Hat Enterprise Linux 8 for x86_64 - Supplementary (RPMs)                                   7.3 kB/s | 2.1 kB     00:00
-Red Hat OpenShift Container Platform 4.12 for RHEL 8 x86_64 (RPMs)                             8.0 kB/s | 2.4 kB     00:00
-Red Hat CodeReady Linux Builder for RHEL 8 x86_64 (RPMs)                                       9.4 kB/s | 2.8 kB     00:00
-Red Hat Enterprise Linux 8 for x86_64 - AppStream (RPMs)                                       9.6 kB/s | 2.8 kB     00:00
-EPEL 8                                                                                         8.3 kB/s | 2.4 kB     00:00
-Dependencies resolved.
-===============================================================================================================================
- Package                       Architecture                 Version                        Repository                     Size
-===============================================================================================================================
-Disabling modules:
- container-tools
-
-Transaction Summary
-===============================================================================================================================
-
-Complete!
-----
-+
-. Now add our external repo COPR podman-next
-+
-NOTE: TODO: add explanation and links etc re copr
-+
-[{format_cmd_output}]
-----
-$ sudo dnf copr enable -y copr.fedorainfracloud.org/rhcontainerbot/podman-next
-----
-+
-.Sample Output
-[source,textinfo]
-----
-Updating Subscription Management repositories.
-Enabling a Copr repository. Please note that this repository is not part
-of the main distribution, and quality may vary.
-
-The Fedora Project does not exercise any power over the contents of
-this repository beyond the rules outlined in the Copr FAQ at
-<https://docs.pagure.org/copr.copr/user_documentation.html#what-i-can-build-in-copr>,
-and packages are not held to any quality or security level.
-
-Please do not file bug reports about these packages in Fedora
-Bugzilla. In case of problems, contact the owner of this repository.
-Repository successfully enabled.
-----
-+
-. Install your Container WebAssembly Toolchain
-+
-[{format_cmd_output}]
-----
-$ sudo dnf install -y crun-wasm podman buildah
-----
-+
-.Sample Output
-[source,textinfo]
-----
-... <TRUNCATED>
-
- nftables-1:0.9.3-26.el8.x86_64
-  podman-101:0.0.git.18290.149f2294-1.el8.x86_64
-  shadow-utils-subid-2:4.6-17.el8.x86_64
-  slirp4netns-1.2.0-10.el8.x86_64
-  spdlog-1.5.0-2.el8.x86_64
-  wasmedge-0.11.2-1.el8.x86_64
-  yajl-2.1.0-18.el8.x86_64
-
-Complete!
-----
-+
-. Next verify you have the correct components
-+
-[{format_cmd_output}]
-----
-$  podman --version; buildah --version
-----
-+
-.Sample Output
-[source,textinfo]
-----
-podman version 4.5.0-dev
-buildah version 1.30.0-dev (image-spec 1.0.2-dev, runtime-spec 1.1.0-rc.1)
-----
-NOTE: Your exact versions may vary, what is importnat is you are saeeing the `--dev` postfix on both `podman` and `buildah`
-+
-. Finally verify that the installed Container Runtime `crun` has support for `wasmedge`
-+
-[{format_cmd_output}]
-----
-$  crun --version
-----
-+
-.Sample Output
-[source,textinfo]
-----
-crun version UNKNOWN
-commit: 6a1943f7ed540b2475a988dd237fd9a9426d14ba
-rundir: /run/user/1001/crun
-spec: 1.0.0
-+SYSTEMD +SELINUX +APPARMOR +CAP +SECCOMP +EBPF +WASM:wasmedge +YAJL
-----
-+
-NOTE: Again your exact output may vary, however key is that the final line contains the WebAssembly support `+WASM:wasmedge`
-
-== Conclusion
-
-We now have both a working Rust and WebAssembly development environment and a Container Toolchain to allow development and running of native WebAssembly Container images. In the next lab we will build several images and run them.
-
-We have:
-
-* A working Rust Development toolchain
-* 
-
-TODO: Cleanup wording
-
-
-== Additional Resources
-
-You can find more information:
-
-    * link:https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_systems_using_the_rhel_9_web_console/index[Managing Systems Using the Web Console]
-
-[discrete]
-== End of Unit
-
-ifdef::env-github[]
-link:../RHEL9-Workshop.adoc#toc[Return to TOC]
-endif::[]
-
-////
-Always end files with a blank line to avoid include problems.
-////

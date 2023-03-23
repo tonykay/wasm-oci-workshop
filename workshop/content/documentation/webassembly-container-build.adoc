@@ -41,11 +41,11 @@ COPY ./target/wasm32-wasi/debug/wasm_app.wasm /
 CMD ["/wasm_app.wasm"]
 ----
 
-`FROM scratch` is most typically used for languages that output static binaries with all their dependencies such as Go. For this to work with WebAssembly we will need a WebAssembly runtime. In this lab we will see how our Container Engine, Podman, can instantiate one.
+`FROM scratch` is most typically used for languages that output static binaries with all their dependencies such as Go. For this to work with WebAssembly we will need a WebAssembly runtime. In this lab we will see how our Container Engine, Podman, can instantiate and supply one *outside* the Container image.
 
-== Building the WebAssembly Image
+== Part 1: Building the WebAssembly Byte Code
 
-You are certainly welcome to use your own code at this point, or your own `.wasm` artifacts. However the 2 examples in our repo have been tried and tested and one, `simple_benchmark_test`, has been designed to facilitate basic benchmarking.o
+You are certainly welcome to use your own code at this point, or your own `.wasm` artifacts. However the 2 examples in our repo have been tried and tested and one, `simple_benchmark_test`, has been designed to facilitate basic benchmarking.
 
 
 . Clone the Git Repo
@@ -80,7 +80,7 @@ NOTE: Full disclosure this code originally came from this Second State repo befo
 
 [{format_cmd_output}]
 ----
-cd wasm-oci-source-code-examples/wasmedge_wasi_socket/examples/http_server/
+$ cd wasm-oci-source-code-examples/wasmedge_wasi_socket/examples/http_server/
 ----
 +
 
@@ -91,7 +91,7 @@ NOTE: You can examine the source with `vim src/main.rs`.
 
 [{format_cmd_output}]
 ----
-cargo build --target wasm32-wasi --release
+$ cargo build --target wasm32-wasi --release
 ----
 +
 .Sample Output
@@ -99,7 +99,8 @@ cargo build --target wasm32-wasi --release
 [source,textinfo]
 ----
 ... <TRUNCATED>
-Compiling libc v0.2.140
+
+   Compiling libc v0.2.140
    Compiling byteorder v1.4.3
    Compiling wasmedge_wasi_socket v0.4.3 (/home/devops/wasm-oci-source-code-examples/wasmedge_wasi_socket)
    Compiling trackable_derive v1.0.0
@@ -142,7 +143,7 @@ $ wasmedge target/wasm32-wasi/release/http_server.wasm &
 
 [{format_cmd_output}]
 ----
-curl -s -X POST http://127.0.0.1:1235 -d '{ "Event" : "WASM IO 2023 BCN" }' | jq
+$ curl -s -X POST http://127.0.0.1:1235 -d '{ "Event" : "WASM IO 2023 BCN" }' | jq
 ----
 +
 
@@ -153,10 +154,26 @@ curl -s -X POST http://127.0.0.1:1235 -d '{ "Event" : "WASM IO 2023 BCN" }' | jq
   "Event": "WASM IO 2023 BCN"
 }
 ----
++
 
 So now we have a working WebAssembly server.
 
-== Building and Running a `.wasm` OCI Container image
+. Make sure to kill the server process as we will
++
+
+[{format_cmd_output}]
+----
+$ kill %1
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+[1]  + 4162 terminated  wasmedge ./target/wasm32-wasi/release/http_server.wasm
+----
+
+== Part 2: Building and Running a `.wasm` OCI Container image
 
 In this section we will first build the 1 layer OCI Image with `buildah` before running it with `podman`.
 
@@ -165,7 +182,7 @@ In this section we will first build the 1 layer OCI Image with `buildah` before 
 
 [{format_cmd_output}]
 ----
-cat Containerfile
+$ cat Containerfile
 ----
 +
  
@@ -184,13 +201,20 @@ This is a pretty typical Containerfile for an image made from `scratch`, effecti
 There are some similarities between WebAssembly and Java in that both are byte code, but Java `.jar` files are combined in larger images with a Java runtime. What is happening here is we are using *OCI* images to solely distribute the Byte Code and not the runtime executable itself.
 +
 
-NOTE: Obviously is is entirely possible to create a _"traditional"_ 
+NOTE: Obviously is is entirely possible to create a _"traditional"_ OCI Container Images including the runtime itself. And currently this has some clear use-cases including:
++
+
+* Ability to run with currently shipping Container Runtimes
+* Run on current Kubernetes distributions
+* Have the widest compatibility 
 +
 
 . Build your application with `buildah`. Whilst `podman` can build OCI images `buildah` is a richer and more versatile build tool. It's beyond the scope of this lab to explore further but a simple `buildah` lab has been bundled in at the end and you can also visit the buildah website.
 +
+
 Remember in an earlier lab you installed the latest upstream versions of both `podman` and `buildah` which contain the most up to date enhancements for working with WebAssembly via `crun`
 +
+
 NOTE: Red Hat has approached Container toolchains by adopting a traditional UNIX/Linux approach where each tool focuses on doing 1 job well. The primary tools are:
 +
 
@@ -208,7 +232,7 @@ WARNING: You will want to substitute your own registry details in the command be
 
 [{format_cmd_output}]
 ----
-buildah build --platform wasm/wasi --annotation "run.oci.handler=wasmedge" -t docker.io/tonykay/http_server:0.1.0 .
+$ buildah build --platform wasm/wasi --annotation "run.oci.handler=wasmedge" -t docker.io/tonykay/http_server:0.1.0 .
 ----
 +
  
@@ -234,7 +258,7 @@ Whilst it's natural to want to go on and run our image and see if it works, lets
 
 [{format_cmd_output}]
 ----
-buildah build \ <1>
+$ buildah build \ <1>
   --platform wasm/wasi \ <2>
   --annotation "run.oci.handler=wasmedge" \ <3>
   -t docker.io/tonykay/http_server:0.1.0 \ <4>
@@ -249,4 +273,4 @@ buildah build \ <1>
 
 == Summary
 
-So in this lab we successfully built our OCI Image. In the next labs we will run and inspect the image before moving on to signing and pushing to an OCI registry such as link:https://quay.io[Quay]. 
+So in this lab we successfully built our OCI Image. In the next labs we will run and inspect the image before moving on to signing and pushing to an OCI registry such as link:https://quay.io[Quay.io]. 

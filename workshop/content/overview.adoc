@@ -12,35 +12,34 @@
 === Acknowledgments
 
   * Ivan Font (Red Hat) - extensive work providing much of the material
-  ** link:
+  ** link:https://github.com/redhat-et/wasm-demo-app[wasm-demo-app]
+  * Andrew Block (Red Hat)
+  * Aditya Rajan
+  * Dan Walsh (Red Hat, author link:https://www.manning.com/books/podman-in-action[Podman in Action])
 
 == Overview
 
 First of all, THANK YOU for choosing to participate in this *WebAssembly and OCI - Better Together Workshop*.
 These hands-on lab will lead you through a series of self-paced labs focussed on different areas of using wasm with OCI technologies.
 
-In this particualr workshop we've chose to use the following mainstream technologies to explore WebAssembly and OCI:
+In this particular workshop I've chosen to use the following mainstream technologies to explore WebAssembly and OCI:
 
 * Rust
 * `wasmedge` - integrated with `crun` ( more on that later)
-* `podman`, `buildah` and `skopeo`
+* `podman`, and `buildah`
 ** At appropriate points we'll compare/contrast with Docker's `containerd` shim approach 
-* Microshift (Red Hat's Open)
-** `CRI-0`
 
- and proctored exercises covering core and updated capabilities of RHEL 9.
-The lab team has worked very hard to assemble a series of exercises to introduce many of the new features and capabilities 
-found in this release.  We hope you enjoy this experience and please don't hesitate to ask questions.  
+In the course of these labs we will be:
 
-
+* Setup a Rust based WebAssembly development environment
+* Building pure WebAssembly OCI Container Images
+** i.e. with a single layer `.wasm` byte code
+* Running these images via Container Engine Podman
+* Signing images with Sigstore
+* Pushing to a remote OCI registry
+* Bonus Lab: Simple Benchmarking Container v Native wasmedge
 
 === Disclaimers!
 
 NOTE: This is not a WebAssembly, or wasm, development workshop. It is focussed on using wasm and OCI technologies together and highlighting both advantages and trade-offs of this approach.
 
-* Building pure WebAssembly Container Images
-** i.e. Single layer `.wasm` artifacts only
-* Running 
-* Introducing 
-* Building pure WebAssembly Container Images
-** i.e. Single layer `.wasm` artifacts only
