@@ -143,7 +143,7 @@ $ wasmedge target/wasm32-wasi/release/http_server.wasm &
 
 [{format_cmd_output}]
 ----
-$ curl -s -X POST http://127.0.0.1:1235 -d '{ "Event" : "WASM IO 2023 BCN" }' | jq
+$ curl -s -X POST http://127.0.0.1:1234 -d '{ "Event" : "WASM IO 2023 BCN" }' | jq
 ----
 +
 
