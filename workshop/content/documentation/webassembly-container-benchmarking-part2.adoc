@@ -1,0 +1,303 @@
+:sectnums:
+:sectnumlevels: 3
+:markup-in-source: verbatim,attributes,quotes
+:imagesdir: ./_images/cockpit-rhel90
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+:ssh_username: <Provided-By-Instructor>
+:ssh_password: <Provided-By-Instructor>
+:targethost_fqdn: <Provided-By-Instructor>
+:subdomain: example.com
+:format_cmd_exec: source,options="nowrap",subs="{markup-in-source}",role="copy"
+:format_cmd_output: bash,options="nowrap",subs="{markup-in-source}"
+ifeval::["%cloud_provider%" == "ec2"]
+:ssh_password: %ssh_password%
+:ssh_username: %ssh_username%
+:targethost_fqdn: %targethost%
+:subdomain: %subdomain_internal%
+:format_cmd_exec: source,options="nowrap",subs="{markup-in-source}",role="execute"
+endif::[]
+
+
+
+:toc:
+:toclevels: 1
+
+= Bonus Lab - Speeding up our WebAssembly and Runtime
+
+In this, second, bonus lab. Let's see if we can make our WebAssembly faster and then run it directly with our OCI Container Runtime itself, `crun`.
+
+== Speeding up the WebAssembly `.wasm`
+
+Some WebAssembly runtimes support both (Just in Time) and AOT (Ahead of Time) compilation, and we get that feature with `wasmedge`.It's beyond the scope of this lab to dive deep into how different WebAssembly Runtimes can do JIT and AOT and the pros and cons. However let's see if we see any gains using `wasmedgec` the `wasmedge` compiler.
+
+. Change directory via `cd` back into your Rust project `simple_benchmark_test`
++
+
+[{format_cmd_output}]
+----
+$ cd ~/wasm-oci-source-code-examples/simple_benchmark_test
+----
+
+. Run the `wasmedgec` compiler against your original `.wasm` artifact to create `faster-benchmark.wasm``
++
+
+[{format_cmd_output}]
+----
+$ wasmedgec ./target/wasm32-wasi/release/simple-benchmark-test.wasm faster-benchmark.wasm
+----
++
+.Sample Output
+[source,textinfo]
+----
+[2023-03-24 09:04:14.945] [info] compile start
+[2023-03-24 09:04:14.969] [info] verify start
+[2023-03-24 09:04:14.986] [info] optimize start
+[2023-03-24 09:04:16.479] [info] codegen start
+[2023-03-24 09:04:17.855] [info] output start
+[2023-03-24 09:04:17.859] [info] compile done
+[2023-03-24 09:04:17.860] [info] output start
+----
+
+. Next edit your Containerfile to reflect the new changes so it looks like this
++
+[{format_cmd_output}]
+----
+FROM scratch
+COPY faster-benchmark.wasm /
+CMD ["/faster-benchmark.wasm"]
+----
+
+. Build your new Container image with `buildah`, annotating it with its runtime
++
+
+[{format_cmd_output}]
+----
+$ buildah build --platform wasm/wasi --annotation "run.oci.handler=wasmedge" -t docker.io/tonykay/faster-benchmark:0.1.0 .
+----
+
+. You can test your new Container Image with `podman`
++
+
+[{format_cmd_output}]
+----
+$ podman run faster-benchmark:0.1.0
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+WARNING: image platform (wasm/wasi) does not match the expected platform (linux/amd64)
+Hello, world
+----
+
+== Perform the simple benchmark tests with `hyperfine`
+
+. First test running directly with `wasmedge`
+
++
+
+[{format_cmd_output}]
+----
+$ hyperfine --shell=none  --warmup 3 --runs 5 "wasmedge ./faster-benchmark.wasm"
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+Benchmark 1: wasmedge ./faster-benchmark.wasm
+  Time (mean ± σ):      1.272 s ±  0.036 s    [User: 0.238 s, System: 0.009 s]
+  Range (min … max):    1.247 s …  1.332 s    5 runs
+----
++
+
+. Not bad, a considerable speedup. next we'll compare to using `podman` with our new image
++
+
+[{format_cmd_output}]
+----
+$ hyperfine --shell=none  --warmup 3 --runs 5 "podman run faster-benchmark:0.1.0"
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+Benchmark 1: podman run faster-benchmark:0.1.0
+  Time (mean ± σ):      1.794 s ±  0.077 s    [User: 0.078 s, System: 0.047 s]
+  Range (min … max):    1.716 s …  1.918 s    5 runs
+----
+
+
+== Running Container Images directly with `crun`
+
+If you recall, `podman` like `docker` is a Container Engine which effectively invokes the Container Runtime, in our case `crun`. We can invoke `crun` directly from the CLI (Command Line)
+with a little setup. We will first need to unpack out Container Image
+
+. `cd` back to your home directory and create a new directory `container-archive` and `cd` in.
++
+
+[{format_cmd_output}]
+----
+$ cd
+$ mkdir container-archive\n\n
+$ cd container-archive
+----
+
+. Next make your `rootfs` filesystem which is what OCI Container Runtimes expect to find
++
+
+[{format_cmd_output}]
+----
+$ mkdir rootfs
+----
+
+. Next we need to "unpack" our Container Image into the `rootfs` with `podman export`
++
+
+[{format_cmd_output}]
+----
+$ podman export $(podman create faster-benchmark:0.1.0) | tar -C rootfs -xvf -
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+WARNING: image platform (wasm/wasi) does not match the expected platform (linux/amd64)
+faster-benchmark.wasm
+----
+
+. Use `tree` to explore your your unpacked image and confirm that it is indeed jut that simple `.wasm` file
++
+
+[{format_cmd_output}]
+----
+$ tree rootfs
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+rootfs
+└── faster-benchmark.wasm
+----
+
+. Next we need to setup `crun` to run the image, starting with creating `config.json` via `crun spec`
++
+
+[{format_cmd_output}]
+----
+crun spec
+----
++
+
+You can confirm that `config.json` was created and explore it with less or vim
++
+
+. Use `sed` to perform several key changes to `config.json`
++
+
+[{format_cmd_output}]
+----
+sed -i 's|"sh"|"/faster-benchmark.wasm"|' config.json\n
+sed -i 's/"terminal": true/"terminal": false/' config.json\n
+sed -i '/"linux": {/i \\t"annotations": {\n\t\t"module.wasm.image/variant": "compat"\n\t},' config.json
+----
+
+. Now we can use `crun` to run our unpacked image
++
+
+[{format_cmd_output}]
+----
+$ crun run faster-benchmark
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+Hello, world!
+largest prime below 38765432 final value : Some(38765393)
+----
+
+== Final Benchmark `crun` v `wasmedge`
+
+Purely for fun, recall our images have been relatively trivial and lack real world common use cases such as network or file I/O, lets benchmark `crun` v `wasmedge`
+
+. First `wasmedge` again. Of course we can use the image in `rootfs` for this
++
+
+[{format_cmd_output}]
+----
+ hyperfine --shell=none  --warmup 3 --runs 5 "wasmedge rootfs/faster-benchmark.wasm"
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+Benchmark 1: wasmedge rootfs/faster-benchmark.wasm
+  Time (mean ± σ):      1.251 s ±  0.007 s    [User: 0.237 s, System: 0.007 s]
+  Range (min … max):    1.246 s …  1.259 s    5 runs
+
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet PC without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
+----
+
+. If you get the same warning as I saw above feel free to run it again
++
+
+.Sample Output
+[source,textinfo]
+----
+Benchmark 1: wasmedge rootfs/faster-benchmark.wasm
+  Time (mean ± σ):      1.283 s ±  0.016 s    [User: 0.239 s, System: 0.009 s]
+  Range (min … max):    1.261 s …  1.300 s    5 runs
+----
+
+. Not bad, now try with `crun`
++
+NOTE: You don't have to tell `crun` the path to `faster-benchmark.wasm`, it expects a `rootfs` and your earlier changes to `config.json` actually gave it the relative path in `rootfs`
++
+
+[{format_cmd_output}]
+----
+hyperfine --shell=none  --warmup 3 --runs 5 "crun run faster-benchmark.wasm"
+----
++
+
+.Sample Output
+[source,textinfo]
+----
+Benchmark 1: crun run faster-benchmark.wasm
+  Time (mean ± σ):      1.299 s ±  0.022 s    [User: 0.244 s, System: 0.023 s]
+  Range (min … max):    1.280 s …  1.327 s    5 runs
+----
+
+WARNING: Your results may vary. On at least one occasion I've seen `crun` clearly outperform `wasmedge` and there are many factors to take into consideration before applying in the real world. See the inline, and online, help and documentation for `wasmedgec` also.
+
+
+= The End
+
+Hopefully the final 2 labs were a fun exercise in benchmarking and getting "closer to the metal" with `crun`.  
+
+More importantly hopefully they gave you exposure to what is going on under the covers when we build WebAssembly containers including:
+
+* How to specify a build via simple Containerfiles
+* What is actually encapsulated within the image
+* How to build, and annotate them, with `buildah`
+* How to run them via `podman` in the same way as traditional containers
+** And what is actually going on under the covers after `podman run`
+* Finally how to export an image and run it directly with an OCI Container Runtime like `crun`
+
+
+Thank you for your time
+
