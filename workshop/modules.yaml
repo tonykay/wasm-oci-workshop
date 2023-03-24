@@ -23,10 +23,7 @@ modules:
     exit_sign: "WebAssembly Container Benchmarking"
   documentation/webassembly-container-benchmarking:
     name:      "WebAssembly Container Benchmarking"
-    exit_sign: "Containers Management (podman)"
-  documentation/podman:
-    name:      "Bonus: Containers Management (podman)"
-    exit_sign: "Containers Dev (buildah)"
-  documentation/buildah:
-    name:      "Bonus: Containers Dev (buildah)"
+    exit_sign: "WebAssembly Container Benchmarking Part 2"
+  documentation/webassembly-container-benchmarking-part2:
+    name:      "WebAssembly Container Benchmarking Part 2"
     exit_sign: "Finish Workshop"

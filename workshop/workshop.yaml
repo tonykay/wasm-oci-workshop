@@ -10,5 +10,4 @@ modules:
     - documentation/webassembly-container-run
     - documentation/webassembly-container-push
     - documentation/webassembly-container-benchmarking
-    - documentation/podman
-    - documentation/buildah
+    - documentation/webassembly-container-benchmarking-part2
